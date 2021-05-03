@@ -7,7 +7,7 @@ import {UQ112x112} from "./Lib/UQ112x112.sol";
 contract PromController {
     address public fspl;
 
-    mapping(uint256 => PromData) promises;
+    mapping(uint256 => PromData) public promises;
 
     mapping(bytes32 => LinkedList) list;
     mapping(bytes32 => bytes32) tail;
@@ -421,6 +421,18 @@ contract PromController {
     {
         PromData memory promData = promises[id];
         return (promData.amountA, promData.assetA, promData.amountB, promData.assetB, promData.time, promData.executed);
+    }
+
+    function getPromiseData_Addr(uint256 id)
+        external
+        view
+        returns (
+            address,
+            address,
+        )
+    {
+        PromData memory promData = promises[id];
+        return (promData.addrA, promData.addrB);
     }
 
 }
