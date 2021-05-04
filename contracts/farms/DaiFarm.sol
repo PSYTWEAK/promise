@@ -25,7 +25,15 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     uint256 public rewardsDuration = 7 days;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
-    uint256[] public ratios;
+
+    address public WETH;
+
+    PromiseOptions[3] public promiseOptions;
+
+    struct PromiseOptions {
+        uint256 ratio;
+        uint256 time;
+    }
 
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
@@ -39,11 +47,19 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
         address _owner,
         address _rewardsDistribution,
         address _rewardsToken,
-        address _stakingToken
+        address _stakingToken,
+        addres _weth,
+        uint256[] ratio,
+        uint256[] time
     ) public Owned(_owner) {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         rewardsDistribution = _rewardsDistribution;
+        WETH = _weth;
+        for (uint256 i; i < 2; i++) {
+            promiseOptions[i].ratio = _ratios[i];
+            promiseOptions[i].times = _times[i];
+        }
     }
 
     /* ========== VIEWS ========== */
@@ -64,10 +80,7 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
         if (_totalSupply == 0) {
             return rewardPerTokenStored;
         }
-        return
-            rewardPerTokenStored.add(
-                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply)
-            );
+        return rewardPerTokenStored.add(lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply));
     }
 
     function earned(address account) public view returns (uint256) {
@@ -80,15 +93,17 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function stake(uint256 amount) external nonReentrant notPaused updateReward(msg.sender) {
+    function createPromise(uint256 amountA, uint256 optionIndex) external nonReentrant {
         require(amount > 0, "Cannot stake 0");
-        _totalSupply = _totalSupply.add(amount);
-        _balances[msg.sender] = _balances[msg.sender].add(amount);
-        stakingToken.safeTransferFrom(msg.sender, address(this), amount);
-        emit Staked(msg.sender, amount);
+        uint256 amountB = ((amountA.mul(1 ether)).mul(promiseOptions[optionIndex].ratio)).div(1 ether);
+        _totalSupply = _totalSupply.add(amountA);
+        _balances[msg.sender] = _balances[msg.sender].add(amountA);
+        token.transferFrom(msg.sender, address(this));
+        IPromController(prom).createPromise(msg.sender, amountA, address(stakingToken), amountB, WETH, promiseOptions[optionIndex].time);
+        emit PromiseCreatedInFarm(msg.sender, amount);
     }
 
-    function withdraw(uint256 amount) public nonReentrant updateReward(msg.sender) {
+    function withdraw(uint256 amount, address account) internal nonReentrant updateReward(msg.sender) {
         require(amount > 0, "Cannot withdraw 0");
         _totalSupply = _totalSupply.sub(amount);
         _balances[msg.sender] = _balances[msg.sender].sub(amount);
@@ -97,17 +112,16 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     }
 
     function getReward() public nonReentrant updateReward(msg.sender) {
+        PromData memory promData = IPromController(prom).promises[id];
+        require(promData.executed == true);
+        require(promData.addrA == msg.sender);
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
             rewardsToken.safeTransfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
-    }
-
-    function exit() external {
-        withdraw(_balances[msg.sender]);
-        getReward();
+        withdraw(promData.amountA, msg.sender);
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
@@ -125,7 +139,7 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
         // This keeps the reward rate in the right range, preventing overflows due to
         // very high values of rewardRate in the earned and rewardsPerToken functions;
         // Reward + leftover must be less than 2^256 / 10^18 to avoid overflow.
-        uint balance = rewardsToken.balanceOf(address(this));
+        uint256 balance = rewardsToken.balanceOf(address(this));
         require(rewardRate <= balance.div(rewardsDuration), "Provided reward too high");
 
         lastUpdateTime = block.timestamp;
@@ -134,7 +148,7 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     }
 
     // End rewards emission earlier
-    function updatePeriodFinish(uint timestamp) external onlyOwner updateReward(address(0)) {
+    function updatePeriodFinish(uint256 timestamp) external onlyOwner updateReward(address(0)) {
         periodFinish = timestamp;
     }
 
@@ -146,16 +160,16 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     }
 
     function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
-        require(
-            block.timestamp > periodFinish,
-            "Previous rewards period must be complete before changing the duration for the new period"
-        );
+        require(block.timestamp > periodFinish, "Previous rewards period must be complete before changing the duration for the new period");
         rewardsDuration = _rewardsDuration;
         emit RewardsDurationUpdated(rewardsDuration);
     }
 
-    function setRatios(uint[] _ratios) external onlyowner {
-        ratios = ratios
+    function setRatios(uint256[] _ratios, uint256[] _times) external onlyowner {
+        for (uint256 i; i < 2; i++) {
+            promiseOptions[i].ratio = _ratios[i];
+            promiseOptions[i].times = _times[i];
+        }
     }
 
     /* ========== MODIFIERS ========== */
@@ -173,7 +187,7 @@ contract DaiFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     /* ========== EVENTS ========== */
 
     event RewardAdded(uint256 reward);
-    event Staked(address indexed user, uint256 amount);
+    event PromiseCreatedInFarm(address indexed user, uint256 amount);
     event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
     event RewardsDurationUpdated(uint256 newDuration);
