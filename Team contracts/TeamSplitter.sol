@@ -11,13 +11,15 @@ contract PromTeamSplitter {
 
   uint256[] public pay_table;
   uint8 public constant payee_count = 2;
-  uint16 public constant scale = 10000;
+  uint16 public constant scale = 20000;
 
   constructor () {
 
     pay_table = [
-      pack(address(0x8960989aCe6737F2a3317951E6De8E7E2d518d0e), 5000),  // 50%
-      pack(address(0x1E67cC1199F312d495694D99C57a3667fBb6FCe5), 5000),  // 50%
+      pack(address(), 5000),  // 25%
+      pack(address(), 5000),  // 25%
+      pack(address(), 5000),  // 25%
+      pack(address(), 5000),  // 25%
     ];
 
     uint sum;

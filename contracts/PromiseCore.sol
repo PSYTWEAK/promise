@@ -2,10 +2,10 @@
 pragma solidity >=0.4.21 <0.7.0;
 
 import {IERC20} from "./interfaces/IERC20.sol";
-import {UQ112x112} from "./Lib/UQ112x112.sol";
+import {SafeMath} from "./Lib/SafeMath.sol";
 
-contract PromController {
-    address public fspl;
+contract PromiseCore {
+    address public feeAddress;
 
     mapping(uint256 => PromData) public promises;
 
@@ -43,8 +43,8 @@ contract PromController {
     event PromiseCanceled(address executor, uint256 id);
     event PromiseExecuted(address executor, uint256 id);
 
-    constructor(address _fspl) public {
-        fspl = _fspl;
+    constructor(address _feeAddress) public {
+        feeAddress = _feeAddress;
     }
 
     function createPromise(
@@ -56,7 +56,7 @@ contract PromController {
         uint256 time
     ) external {
         IERC20 token = IERC20(assetA);
-        token.transferFrom(msg.sender, address(this), amountA / 2);
+        token.transferFrom(msg.sender, address(this), amountA.div(2));
         _createPromise(account, amountA, assetA, amountB, assetB, time);
     }
 
@@ -66,7 +66,7 @@ contract PromController {
         bytes32 index
     ) external {
         IERC20 token = IERC20(promises[id].assetB);
-        token.transferFrom(msg.sender, address(this), promises[id].amountB / 2);
+        token.transferFrom(msg.sender, address(this), promises[id].amountB.div(2));
         _joinPromise(id, account, index);
     }
 
@@ -78,11 +78,11 @@ contract PromController {
         IERC20 token;
         if (account == promData.addrA) {
             token = IERC20(promData.assetA);
-            token.transferFrom(msg.sender, address(this), promData.amountA / 2);
+            token.transferFrom(msg.sender, address(this), promData.amountA.div(2));
             promises[id].owedA = 0;
         } else if (account == promData.addrB) {
             token = IERC20(promData.assetB);
-            token.transferFrom(msg.sender, address(this), promData.amountB / 2);
+            token.transferFrom(msg.sender, address(this), promData.amountB.div(2));
             promises[id].owedB = 0;
         }
     }
@@ -96,7 +96,7 @@ contract PromController {
         require(promises[id].addrB == address(0x0), "Promise cant be canceled once active");
         require(promises[id].executed == false, "This promise has been executed");
         IERC20 tokenA = IERC20(promises[id].assetA);
-        tokenA.transfer(promises[id].addrA, promises[id].amountA / 2);
+        tokenA.transfer(promises[id].addrA, promises[id].amountA.div(2));
 
         bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
         deleteEntry(id, listId, joinableIndex);
@@ -136,10 +136,10 @@ contract PromController {
         address assetB,
         uint256 time
     ) internal {
-        require(time > block.timestamp + 10 minutes, "Expiry date is in the past");
+        require(time > block.timestamp.add(10 minutes), "Expiry date is in the past");
         lastId += 1;
         uint256 id = lastId;
-        promises[id] = PromData(account, amountA, assetA, amountA / 2, address(0x0), amountB, assetB, amountB, time, false);
+        promises[id] = PromData(account, amountA, assetA, amountA.div(2), address(0x0), amountB, assetB, amountB, time, false);
 
         bytes32 listId = sha256(abi.encodePacked(assetA, assetB));
         bytes32 entry = sha256(abi.encodePacked(listId, id));
@@ -160,7 +160,7 @@ contract PromController {
         require(promises[id].time > block.timestamp, "Expiry date is in the past and can't be joined");
         require(promises[id].addrB == address(0x0), "This promise has already been joined");
         require(account != promises[id].addrB, "This promise has already been joined");
-        promises[id].owedB = promises[id].amountB / 2;
+        promises[id].owedB = promises[id].amountB.div(2);
         promises[id].addrB = account;
         bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
 
@@ -231,27 +231,23 @@ contract PromController {
         address assA,
         address assB
     ) internal {
-        uint256 fA = UQ112x112.uqdiv(uint224(amA), 300);
-        uint256 fB = UQ112x112.uqdiv(uint224(amB), 300);
+        uint256 fA = amA.div(200);
+        uint256 fB = amB.div(200);
 
         if (oweA == 0 && oweB == 0) {
-            IERC20(assA).transfer(b, amA - fA);
-            IERC20(assB).transfer(a, amB - fB);
-            IERC20(assA).transfer(fspl, fA);
-            IERC20(assB).transfer(fspl, fB);
+            IERC20(assA).transfer(b, amA.sub(fA));
+            IERC20(assB).transfer(a, amB.sub(fB));
+            IERC20(assA).transfer(feeAddress, fA);
+            IERC20(assB).transfer(feeAddress, fB);
         } else if (oweA == 0 && oweB > 0) {
-             IERC20(assA).transfer(a, amA - fA);
-            IERC20(assB).transfer(a, amB / 2 - fB);
-             IERC20(assA).transfer(fspl, fA);
-           IERC20(assB).transfer(fspl, fB);
+            IERC20(assA).transfer(a, amA);
+            IERC20(assB).transfer(a, amB2);
         } else if (oweB == 0 && oweA > 0) {
-             IERC20(assA).transfer(b, amA / 2 - fA);
-            IERC20(assB).transfer(b, amB - fB);
-             IERC20(assA).transfer(fspl, fA);
-            IERC20(assB).transfer(fspl, fB);
+            IERC20(assA).transfer(b, amA.div(2));
+            IERC20(assB).transfer(b, amB);
         } else {
-             IERC20(assA).transfer(a, amA / 2);
-            IERC20(assB).transfer(b, amB / 2);
+            IERC20(assA).transfer(a, amA);
+            IERC20(assB).transfer(b, amB);
         }
     }
 
@@ -275,11 +271,11 @@ contract PromController {
         external
         view
         returns (
-            uint256[] memory,
-            uint256[] memory,
-            uint256[] memory,
-            address[] memory,
-            address[] memory
+            uint256[] memory id,
+            uint256[] memory amountA,
+            uint256[] memory amountB,
+            address[] memory assetA,
+            address[] memory assetB
         )
     {
         bytes32 listId;
@@ -290,15 +286,11 @@ contract PromController {
         }
         uint256 _length = length[listId];
 
-        uint256[] memory id = new uint256[](_length);
-
-        uint256[] memory amountA = new uint256[](_length);
-
-        uint256[] memory amountB = new uint256[](_length);
-
-        address[] memory assetA = new address[](_length);
-
-        address[] memory assetB = new address[](_length);
+        id = new uint256[](_length);
+        amountA = new uint256[](_length);
+        amountB = new uint256[](_length);
+        assetA = new address[](_length);
+        assetB = new address[](_length);
 
         uint256 i = 0;
         bytes32 index = listId;
@@ -311,8 +303,6 @@ contract PromController {
             index = list[index].next;
             i += 1;
         }
-
-        return (id, amountA, amountB, assetA, assetB);
     }
 
     function getPromises_Time_Executed_Addr(
@@ -324,11 +314,11 @@ contract PromController {
         external
         view
         returns (
-            uint256[] memory,
-            uint256[] memory,
-            bool[] memory,
-            address[] memory,
-            address[] memory
+            uint256[] memory id,
+            uint256[] memory time,
+            bool[] memory executed,
+            address[] memory addrA,
+            address[] memory addrB
         )
     {
         bytes32 listId;
@@ -339,15 +329,11 @@ contract PromController {
         }
         uint256 _length = length[listId];
 
-        uint256[] memory id = new uint256[](_length);
-
-        uint256[] memory time = new uint256[](_length);
-
-        bool[] memory executed = new bool[](_length);
-
-        address[] memory addrA = new address[](_length);
-
-        address[] memory addrB = new address[](_length);
+        id = new uint256[](_length);
+        time = new uint256[](_length);
+        executed = new bool[](_length);
+        addrA = new address[](_length);
+        addrB = new address[](_length);
 
         uint256 i = 0;
         bytes32 index = listId;
@@ -360,8 +346,6 @@ contract PromController {
             index = list[index].next;
             i += 1;
         }
-
-        return (id, time, executed, addrA, addrB);
     }
 
     function getPromises_owed(
@@ -373,9 +357,9 @@ contract PromController {
         external
         view
         returns (
-            uint256[] memory,
-            uint256[] memory,
-            uint256[] memory
+            uint256[] memory id,
+            uint256[] memory owedA,
+            uint256[] memory owedB
         )
     {
         bytes32 listId;
@@ -386,11 +370,9 @@ contract PromController {
         }
         uint256 _length = length[listId];
 
-        uint256[] memory id = new uint256[](_length);
-
-        uint256[] memory owedA = new uint256[](_length);
-
-        uint256[] memory owedB = new uint256[](_length);
+        id = new uint256[](_length);
+        owedA = new uint256[](_length);
+        owedB = new uint256[](_length);
 
         uint256 i = 0;
         bytes32 index = listId;
@@ -401,8 +383,6 @@ contract PromController {
             index = list[index].next;
             i += 1;
         }
-
-        return (id, owedA, owedB);
     }
 
     /** Single Promise Data **/
