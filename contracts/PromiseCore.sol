@@ -25,7 +25,7 @@ contract PromiseCore {
         /** ---------------------
          a is the creator
          b is the joiner
-         time is the minimum date it can be executed
+         time is the minimum time it can be executed
         --------------------- **/
         address addrA;
         uint256 amountA;
@@ -114,12 +114,10 @@ contract PromiseCore {
     ) external {
         require(promises[id].time <= block.timestamp, "This promise has not expired yet");
         require(promises[id].executed == false, "This promise has been executed");
+        promises[id].executed = true;
         PromData memory promData = promises[id];
 
         payOut(promData.amountA, promData.amountB, promData.owedA, promData.owedB, promData.addrA, promData.addrB, promData.assetA, promData.assetB);
-
-        promises[id].executed = true;
-
         bytes32 listId = sha256(abi.encodePacked(promises[id].addrA));
         deleteEntry(id, listId, creatorAccIndex);
         listId = sha256(abi.encodePacked(promises[id].addrB));
@@ -241,7 +239,7 @@ contract PromiseCore {
             IERC20(assB).transfer(feeAddress, fB);
         } else if (oweA == 0 && oweB > 0) {
             IERC20(assA).transfer(a, amA);
-            IERC20(assB).transfer(a, amB2);
+            IERC20(assB).transfer(a, amB);
         } else if (oweB == 0 && oweA > 0) {
             IERC20(assA).transfer(b, amA.div(2));
             IERC20(assB).transfer(b, amB);

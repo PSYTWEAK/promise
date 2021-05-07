@@ -1,20 +1,17 @@
-pragma solidity ^0.5.16;
+pragma solidity ^0.8.0;
 
-import "openzeppelin-solidity-2.3.0/contracts/math/Math.sol";
-import "openzeppelin-solidity-2.3.0/contracts/math/SafeMath.sol";
-import "openzeppelin-solidity-2.3.0/contracts/token/ERC20/ERC20Detailed.sol";
-import "openzeppelin-solidity-2.3.0/contracts/token/ERC20/SafeERC20.sol";
-import "openzeppelin-solidity-2.3.0/contracts/utils/ReentrancyGuard.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
+import {Math} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
+import {SafeMath} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+import {SafeERC20} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {ReentrancyGuard} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
-// Inheritanc
-import "./interfaces/IStakingRewards.sol";
-import "./RewardsDistributionRecipient.sol";
-import "./Pausable.sol";
+// Inheritance
+import {RewardsDistributionRecipient} from "../Lib/RewardsDistributionRecipient.sol";
+import {IWETH} from "../interfaces/IWETH.sol";
+import {IPromController} from "../interfaces/IPromController.sol";
 
-import {IWETH} from "./interfaces/IWETH.sol";
-
-// https://docs.synthetix.io/contracts/source/contracts/stakingrewards
-contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGuard, Pausable {
+contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
@@ -24,18 +21,30 @@ contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     IERC20 public stakingToken;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
-    uint256 public rewardsDuration = 7 days;
+    uint256 public rewardsDuration = 60 days;
     uint256 public lastUpdateTime;
     uint256 public rewardPerTokenStored;
 
-    address public immutable WETH;
-    address public DAI;
+    address public WETH;
+    address public prom;
 
     PromiseOptions[3] public promiseOptions;
 
     struct PromiseOptions {
         uint256 ratio;
         uint256 time;
+    }
+    struct PromData {
+        address addrA;
+        uint256 amountA;
+        address assetA;
+        uint256 owedA;
+        address addrB;
+        uint256 amountB;
+        address assetB;
+        uint256 owedB;
+        uint256 time;
+        bool executed;
     }
 
     mapping(address => uint256) public userRewardPerTokenPaid;
@@ -47,23 +56,15 @@ contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
     /* ========== CONSTRUCTOR ========== */
 
     constructor(
-        address _owner,
-        address _rewardsDistribution,
         address _rewardsToken,
         address _stakingToken,
-        addres _dai,
-        uint256[] ratio,
-        uint256[] time
-    ) public Owned(_owner) {
+        address _prom
+    ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
-        WETH = IWETH(_stakingToken)
-        rewardsDistribution = _rewardsDistribution;
-        DAI = _dai;
-        for (uint256 i; i < 2; i++) {
-            promiseOptions[i].ratio = _ratios[i];
-            promiseOptions[i].times = _times[i];
-        }
+        WETH = _stakingToken;
+        rewardsDistribution = msg.sender;
+        prom = _prom;
     }
 
     /* ========== VIEWS ========== */
@@ -97,40 +98,47 @@ contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
 
     /* ========== MUTATIVE FUNCTIONS ========== */
 
-    function createPromise(uint256 optionIndex) external payable nonReentrant {
-        require(amount > 0, "Cannot stake 0");
+    function createPromise(uint256 optionIndex) external payable nonReentrant updateReward(msg.sender) {
         uint256 amountB = ((msg.value.mul(1 ether)).mul(promiseOptions[optionIndex].ratio)).div(1 ether);
         _totalSupply = _totalSupply.add(msg.value);
         _balances[msg.sender] = _balances[msg.sender].add(msg.value);
         IWETH(WETH).deposit{value: msg.value}();
         IPromController(prom).createPromise(msg.sender, msg.value.mul(2), address(stakingToken), amountB, WETH, promiseOptions[optionIndex].time);
-        emit PromiseCreatedInFarm(msg.sender, amount);
+        emit PromiseCreatedInFarm(msg.sender, amountB);
     }
 
-    function withdraw(uint256 amount, address account) internal nonReentrant updateReward(msg.sender) {
-        require(amount > 0, "Cannot withdraw 0");
-        _totalSupply = _totalSupply.sub(amount);
-        _balances[msg.sender] = _balances[msg.sender].sub(amount);
-        stakingToken.safeTransfer(msg.sender, amount);
-        emit Withdrawn(msg.sender, amount);
-    }
+    function getReward(uint256 id) public nonReentrant updateReward(msg.sender) {
+        uint256 amountA;
+        address assetA;
+        uint256 amountB;
+        address assetB;
+        uint256 time;
+        bool executed;
+        (amountA, assetA, amountB, assetB, time, executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
+        address addrA;
+        address addrB;
+        (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
 
-    function getReward() public nonReentrant updateReward(msg.sender) {
-        PromData memory promData = IPromController(prom).promises[id];
-        require(promData.executed == true);
-        require(promData.addrA == msg.sender);
+        require(executed == true);
+        require(addrA == msg.sender);
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
-            rewardsToken.safeTransfer(msg.sender, reward);
+            rewardsToken.transfer(msg.sender, reward);
             emit RewardPaid(msg.sender, reward);
         }
-        withdraw(promData.amountA, msg.sender);
+    }
+
+    function setRatios(uint256[3] memory _ratios, uint256[3] memory _times) external onlyRewardsDistribution {
+        for (uint256 i; i < 3; i++) {
+            promiseOptions[i].ratio = _ratios[i];
+            promiseOptions[i].time = _times[i];
+        }
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
 
-    function notifyRewardAmount(uint256 reward) external onlyRewardsDistribution updateReward(address(0)) {
+    function notifyRewardAmount(uint256 reward) external override onlyRewardsDistribution updateReward(address(0)) {
         if (block.timestamp >= periodFinish) {
             rewardRate = reward.div(rewardsDuration);
         } else {
@@ -151,31 +159,6 @@ contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
         emit RewardAdded(reward);
     }
 
-    // End rewards emission earlier
-    function updatePeriodFinish(uint256 timestamp) external onlyOwner updateReward(address(0)) {
-        periodFinish = timestamp;
-    }
-
-    // Added to support recovering LP Rewards from other systems such as BAL to be distributed to holders
-    function recoverERC20(address tokenAddress, uint256 tokenAmount) external onlyOwner {
-        require(tokenAddress != address(stakingToken), "Cannot withdraw the staking token");
-        IERC20(tokenAddress).safeTransfer(owner, tokenAmount);
-        emit Recovered(tokenAddress, tokenAmount);
-    }
-
-    function setRewardsDuration(uint256 _rewardsDuration) external onlyOwner {
-        require(block.timestamp > periodFinish, "Previous rewards period must be complete before changing the duration for the new period");
-        rewardsDuration = _rewardsDuration;
-        emit RewardsDurationUpdated(rewardsDuration);
-    }
-
-    function setRatios(uint256[] _ratios, uint256[] _times) external onlyowner {
-        for (uint256 i; i < 2; i++) {
-            promiseOptions[i].ratio = _ratios[i];
-            promiseOptions[i].times = _times[i];
-        }
-    }
-
     /* ========== MODIFIERS ========== */
 
     modifier updateReward(address account) {
@@ -192,8 +175,5 @@ contract EthFarm is IStakingRewards, RewardsDistributionRecipient, ReentrancyGua
 
     event RewardAdded(uint256 reward);
     event PromiseCreatedInFarm(address indexed user, uint256 amount);
-    event Withdrawn(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
-    event RewardsDurationUpdated(uint256 newDuration);
-    event Recovered(address token, uint256 amount);
 }
