@@ -1,13 +1,15 @@
+
 pragma solidity ^0.8.0;
 
-import {IERC20} from "../interfaces/IERC20.sol";
-import {Math} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
-import {SafeMath} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
-import {SafeERC20} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import {ReentrancyGuard} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import { IERC20 } from "../interfaces/IERC20.sol";
+import { Math } from  "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
+import { SafeMath } from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+import { SafeERC20 } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+
 
 // Inheritance
-import {RewardsDistributionRecipient} from "../Lib/RewardsDistributionRecipient.sol";
+import { RewardsDistributionRecipient } from  "../Lib/RewardsDistributionRecipient.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {IPromController} from "../interfaces/IPromController.sol";
 
@@ -18,7 +20,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     /* ========== STATE VARIABLES ========== */
 
     IERC20 public rewardsToken;
-    IERC20 public stakingToken;
+    IWETH public stakingToken;
     uint256 public periodFinish = 0;
     uint256 public rewardRate = 0;
     uint256 public rewardsDuration = 60 days;
@@ -26,27 +28,16 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     uint256 public rewardPerTokenStored;
 
     address public WETH;
+    address public DAI;
     address public prom;
 
     PromiseOptions[3] public promiseOptions;
-
+    
     struct PromiseOptions {
         uint256 ratio;
         uint256 time;
     }
-    struct PromData {
-        address addrA;
-        uint256 amountA;
-        address assetA;
-        uint256 owedA;
-        address addrB;
-        uint256 amountB;
-        address assetB;
-        uint256 owedB;
-        uint256 time;
-        bool executed;
-    }
-
+    
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
 
@@ -58,13 +49,19 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     constructor(
         address _rewardsToken,
         address _stakingToken,
+        address _dai,
         address _prom
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
-        WETH = _stakingToken;
-        rewardsDistribution = msg.sender;
+        WETH = _stakingToken
+        DAI = _dai;
         prom = _prom;
+        rewardsDistribution = msg.sender;
+        for (uint256 i; i < 3; i++) {
+            promiseOptions[i].ratio = 1000 + i;
+            promiseOptions[i].time = 1631019788 + i;
+        }
     }
 
     /* ========== VIEWS ========== */
@@ -99,26 +96,28 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function createPromise(uint256 optionIndex) external payable nonReentrant updateReward(msg.sender) {
-        uint256 amountB = ((msg.value.mul(1 ether)).mul(promiseOptions[optionIndex].ratio)).div(1 ether);
+        uint256 amountB = (msg.value.mul(promiseOptions[optionIndex].ratio));
         _totalSupply = _totalSupply.add(msg.value);
         _balances[msg.sender] = _balances[msg.sender].add(msg.value);
-        IWETH(WETH).deposit{value: msg.value}();
-        IPromController(prom).createPromise(msg.sender, msg.value.mul(2), address(stakingToken), amountB, WETH, promiseOptions[optionIndex].time);
+        stakingToken.deposit{value: msg.value}();
+        IPromController(prom).createPromise(msg.sender, (msg.value).mul(2), WETH, amountB, DAI, promiseOptions[optionIndex].time);
         emit PromiseCreatedInFarm(msg.sender, amountB);
     }
 
-    function getReward(uint256 id) public nonReentrant updateReward(msg.sender) {
-        uint256 amountA;
-        address assetA;
-        uint256 amountB;
-        address assetB;
-        uint256 time;
-        bool executed;
-        (amountA, assetA, amountB, assetB, time, executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
-        address addrA;
-        address addrB;
-        (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
+    function getReward(uint id) public nonReentrant updateReward(msg.sender) {
 
+            uint amountA;
+    address assetA;
+    uint amountB;
+    address assetB;
+    uint time;
+    bool executed;
+    (amountA,assetA,amountB,assetB,time,executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
+        address addrA;
+    address addrB;
+    (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
+
+        
         require(executed == true);
         require(addrA == msg.sender);
         uint256 reward = rewards[msg.sender];
@@ -129,14 +128,19 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         }
     }
 
+
     function setRatios(uint256[3] memory _ratios, uint256[3] memory _times) external onlyRewardsDistribution {
-        for (uint256 i; i < 3; i++) {
+        for (uint256 i; i < 3;i++) {
             promiseOptions[i].ratio = _ratios[i];
             promiseOptions[i].time = _times[i];
         }
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
+    
+    function approveProm() external onlyRewardsDistribution {
+        stakingToken.approve(prom, 2**256 - 1);
+    }
 
     function notifyRewardAmount(uint256 reward) external override onlyRewardsDistribution updateReward(address(0)) {
         if (block.timestamp >= periodFinish) {

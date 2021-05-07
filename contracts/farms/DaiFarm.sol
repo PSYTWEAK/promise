@@ -26,6 +26,7 @@ contract DaiFarm is RewardsDistributionRecipient, ReentrancyGuard {
     uint256 public rewardPerTokenStored;
 
     address public DAI;
+    address public WETH;
     address public prom;
 
     PromiseOptions[3] public promiseOptions;
@@ -58,13 +59,15 @@ contract DaiFarm is RewardsDistributionRecipient, ReentrancyGuard {
     constructor(
         address _rewardsToken,
         address _stakingToken,
-        address _prom
+        address _prom,
+        address _weth
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
         DAI = _stakingToken;
-        rewardsDistribution = msg.sender;
         prom = _prom;
+        WETH = _weth;
+        rewardsDistribution = msg.sender;
     }
 
     /* ========== VIEWS ========== */
@@ -99,13 +102,12 @@ contract DaiFarm is RewardsDistributionRecipient, ReentrancyGuard {
     /* ========== MUTATIVE FUNCTIONS ========== */
 
     function createPromise(uint256 amountA, uint256 optionIndex) external nonReentrant {
-        require(amount > 0, "Cannot stake 0");
         uint256 amountB = ((amountA.mul(1 ether)).mul(promiseOptions[optionIndex].ratio)).div(1 ether);
         _totalSupply = _totalSupply.add(amountA);
         _balances[msg.sender] = _balances[msg.sender].add(amountA);
-        token.transferFrom(msg.sender, address(this));
+        IERC20(DAI).transferFrom(msg.sender, address(this), amountB);
         IPromController(prom).createPromise(msg.sender, amountA, address(stakingToken), amountB, WETH, promiseOptions[optionIndex].time);
-        emit PromiseCreatedInFarm(msg.sender, amount);
+        emit PromiseCreatedInFarm(msg.sender, amountB);
     }
 
     function getReward(uint256 id) public nonReentrant updateReward(msg.sender) {
