@@ -15,29 +15,37 @@ contract PromiseCore {
 
     uint256 public lastId;
 
+    struct PromData {
+        address creator;
+        address cAsset;
+        uint256 cSelling;
+        uint256 cDebt;
+        bool cExecuted;
+        bytes32 joinersInfo;
+        address jAsset;
+        uint256 jSelling;
+        uint256 jDebt;
+        uint256 jPaid;
+        uint256 time;
+        bool executed;
+    }
+
+    struct JoinersInfo {
+        address joiners;
+        uint256 paid;
+        uint256 debt;
+        bool joinerExecuted;
+    }
+
     struct LinkedList {
         bytes32 next;
         uint256 id;
         bytes32 previous;
     }
 
-    struct PromData {
-        /** ---------------------
-         a is the creator
-         b is the joiner
-         time is the minimum time it can be executed
-        --------------------- **/
-        address addrA;
-        uint256 amountA;
-        address assetA;
-        uint256 owedA;
-        address addrB;
-        uint256 amountB;
-        address assetB;
-        uint256 owedB;
-        uint256 time;
-        bool executed;
-    }
+
+
+
     event PromiseCreated(address addrA, uint256 amountA, address assetA, uint256 amountB, address assetB, uint256 time);
     event PromiseJoined(address addrB, uint256 id);
     event PromiseCanceled(address executor, uint256 id);
