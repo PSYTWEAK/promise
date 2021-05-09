@@ -40,6 +40,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
+    mapping(uint256 => bool) public logged;
 
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
@@ -97,29 +98,33 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
 
     function createPromise(uint256 optionIndex) external payable nonReentrant updateReward(msg.sender) {
         uint256 amountB = (msg.value.mul(promiseOptions[optionIndex].ratio));
-        _totalSupply = _totalSupply.add(msg.value);
-        _balances[msg.sender] = _balances[msg.sender].add(msg.value);
         stakingToken.deposit{value: msg.value}();
-        IPromController(prom).createPromise(msg.sender, (msg.value).mul(2), WETH, amountB, DAI, promiseOptions[optionIndex].time);
+        IPromController(prom).createPromise(msg.sender, (msg.value).mul(2), address(stakingToken), amountB, DAI, promiseOptions[optionIndex].time);
         emit PromiseCreatedInFarm(msg.sender, amountB);
     }
-
-    function getReward(uint id) public nonReentrant updateReward(msg.sender) {
-
+    
+    function logPromiseAfterJoined(uint id) external nonReentrant updateReward(msg.sender) {
+        require(logged[id] == false);
+        logged[id] = true;
             uint amountA;
-    address assetA;
+           address assetA;
     uint amountB;
     address assetB;
     uint time;
     bool executed;
-    (amountA,assetA,amountB,assetB,time,executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
-        address addrA;
+    address addrA;
     address addrB;
+    (amountA,assetA,amountB,assetB,time,executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
     (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
 
-        
-        require(executed == true);
+        // commented while testing
+        // require(executed == true);
         require(addrA == msg.sender);
+        _totalSupply = _totalSupply.add(amountA);
+        _balances[msg.sender] = _balances[msg.sender].add(amountA);
+    }
+
+    function getReward(uint id) public nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
