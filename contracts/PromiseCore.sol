@@ -8,6 +8,8 @@ contract PromiseCore {
     address public feeAddress;
 
     mapping(uint256 => PromData) public promises;
+    mapping(uint256 => mapping(uint256 => JoinersInfo)) public joiners;
+    mapping(uint256 => uint256) public joinersLength;
 
     mapping(bytes32 => LinkedList) list;
     mapping(bytes32 => bytes32) tail;
@@ -18,20 +20,19 @@ contract PromiseCore {
     struct PromData {
         address creator;
         address cAsset;
-        uint256 cSelling;
+        uint256 cAmount;
         uint256 cDebt;
         bool cExecuted;
         bytes32 joinersInfo;
         address jAsset;
-        uint256 jSelling;
+        uint256 jAmount;
         uint256 jDebt;
-        uint256 jPaid;
-        uint256 time;
-        bool executed;
+        uint256 jPaidFull;
+        uint256 expiry;
     }
 
     struct JoinersInfo {
-        address joiners;
+        address joiner;
         uint256 paid;
         uint256 debt;
         bool joinerExecuted;
@@ -43,11 +44,8 @@ contract PromiseCore {
         bytes32 previous;
     }
 
-
-
-
-    event PromiseCreated(address addrA, uint256 amountA, address assetA, uint256 amountB, address assetB, uint256 time);
-    event PromiseJoined(address addrB, uint256 id);
+    event PromiseCreated(address creator, address cAsset, uint cAmount, address jAsset, uint jAmount, uint expiry);
+    event PromiseJoined(address addrB, uint256 id, uint256 amount);
     event PromiseCanceled(address executor, uint256 id);
     event PromiseExecuted(address executor, uint256 id);
 
@@ -56,16 +54,15 @@ contract PromiseCore {
     }
 
     function createPromise(
-        address account,
-        uint256 amountA,
-        address assetA,
-        uint256 amountB,
-        address assetB,
-        uint256 time
+        address account,        
+        address cAsset,
+        uint256 cAmount,        
+        address jAsset,
+        uint256 jAmount,
+        uint256 expiry
     ) external {
-        IERC20 token = IERC20(assetA);
-        token.transferFrom(msg.sender, address(this), amountA.div(2));
-        _createPromise(account, amountA, assetA, amountB, assetB, time);
+        IERC20(assetA).transferFrom(msg.sender, address(this), cAmount.div(2));
+        _createPromise(account, cAsset, cAmount, jAsset, jAmount, expiry);
     }
 
     function joinPromise(
@@ -133,21 +130,20 @@ contract PromiseCore {
 
         emit PromiseExecuted(msg.sender, id);
     }
-
     function _createPromise(
         address account,
-        uint256 amountA,
-        address assetA,
-        uint256 amountB,
-        address assetB,
-        uint256 time
+        address cAsset,        
+        uint256 cAmount,
+        address jAsset,
+        uint256 jAmount,
+        uint256 expiry
     ) internal {
-        require(time > block.timestamp.add(10 minutes), "Expiry date is in the past");
+        require(expiry > block.timestamp.add(10 minutes), "Expiry date is in the past");
         lastId += 1;
         uint256 id = lastId;
-        promises[id] = PromData(account, amountA, assetA, amountA.div(2), address(0x0), amountB, assetB, amountB, time, false);
+        promises[id] = PromData(account, cAsset, cAmount, cAmount.div(2), false, "", jAsset, jAmount, 0, expiry);
 
-        bytes32 listId = sha256(abi.encodePacked(assetA, assetB));
+        bytes32 listId = sha256(abi.encodePacked(cAsset, jAsset));
         bytes32 entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
 
@@ -155,28 +151,41 @@ contract PromiseCore {
         entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
 
-        emit PromiseCreated(account, amountA, assetA, amountB, assetB, time);
+        emit PromiseCreated(account, cAsset, cAmount, jAsset, jAmount, expiry);
     }
+
 
     function _joinPromise(
         uint256 id,
         address account,
+        uint256 amount,
         bytes32 index
     ) internal {
-        require(promises[id].time > block.timestamp, "Expiry date is in the past and can't be joined");
-        require(promises[id].addrB == address(0x0), "This promise has already been joined");
-        require(account != promises[id].addrB, "This promise has already been joined");
-        promises[id].owedB = promises[id].amountB.div(2);
-        promises[id].addrB = account;
-        bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
+        PromData memory promData = promises[id];
+        require(promData.expiry > block.timestamp, "Expiry date is in the past and can't be joined");
+        require(amount <= promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaidFull)) , "Amount too high for this promise")
+        promData.jDebt += amount;
+        joiners[id][joinerLength[id]] = (account, amount, amount, false);
 
-        deleteEntry(id, listId, index);
-
-        listId = sha256(abi.encodePacked(account));
+       /*        
+       Adding entries to two linked lists:
+       firstly adding this promise to a list of promises the account is involved with
+       secondly adding this account and info (paid, debt, executed) to the list of joiner info for this promise
+       */
+        bytes32 listId = sha256(abi.encodePacked(account));
         bytes32 entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
-
-        emit PromiseJoined(account, id);
+        listId = sha256(abi.encodePacked(id))
+        entry = sha256(abi.encodePacked(listId, account));
+        addEntry(joinersLength[id], listId, entry);
+       /*        
+       if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
+       */
+        if (promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaidFull)) == 0) {
+           bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
+           deleteEntry(id, listId, index);
+        }
+        emit PromiseJoined(account, id, amount);
     }
 
     function addEntry(
