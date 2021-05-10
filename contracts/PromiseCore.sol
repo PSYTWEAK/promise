@@ -93,9 +93,7 @@ contract PromiseCore {
     }
 
     function cancelPromise(
-        uint256 id,
-        bytes32 accountIndex,
-        bytes32 joinableIndex
+        uint256 id
     ) external {
         require(msg.sender == promises[id].addrA, "This account is not involved in this promise");
         require(promises[id].addrB == address(0x0), "Promise cant be canceled once active");
@@ -104,9 +102,11 @@ contract PromiseCore {
         tokenA.transfer(promises[id].addrA, promises[id].amountA.div(2));
 
         bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
-        deleteEntry(id, listId, joinableIndex);
+        bytes32 index = sha256(abi.encodePacked(listId, id));
+        deleteEntry(id, listId, index);
         listId = sha256(abi.encodePacked(msg.sender));
-        deleteEntry(id, listId, accountIndex);
+        index = sha256(abi.encodePacked(listId, id))
+        deleteEntry(id, listId, index);
 
         promises[id].executed = true;
         emit PromiseCanceled(msg.sender, id);
@@ -114,8 +114,6 @@ contract PromiseCore {
 
     function executePromise(
         uint256 id,
-        bytes32 creatorAccIndex,
-        bytes32 joinerAccIndex
     ) external {
         require(promises[id].time <= block.timestamp, "This promise has not expired yet");
         require(promises[id].executed == false, "This promise has been executed");
@@ -124,9 +122,11 @@ contract PromiseCore {
 
         payOut(promData.amountA, promData.amountB, promData.owedA, promData.owedB, promData.addrA, promData.addrB, promData.assetA, promData.assetB);
         bytes32 listId = sha256(abi.encodePacked(promises[id].addrA));
-        deleteEntry(id, listId, creatorAccIndex);
+        bytes32 index = sha256(abi.encodePacked(listId, id));
+        deleteEntry(id, listId, index);
         listId = sha256(abi.encodePacked(promises[id].addrB));
-        deleteEntry(id, listId, joinerAccIndex);
+        index = sha256(abi.encodePacked(listId, id));
+        deleteEntry(id, listId, index);
 
         emit PromiseExecuted(msg.sender, id);
     }
@@ -218,22 +218,6 @@ contract PromiseCore {
 
     function getPairID(address assetA, address assetB) public view returns (bytes32) {
         return sha256(abi.encodePacked(assetA, assetB));
-    }
-
-    function getIndexAccount(uint256 id, address account) public view returns (bytes32) {
-        bytes32 index = sha256(abi.encodePacked(account));
-        while (id != list[index].id) {
-            index = list[index].next;
-        }
-        return index;
-    }
-
-    function getIndexJoinable(uint256 id) public view returns (bytes32) {
-        bytes32 index = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
-        while (id != list[index].id) {
-            index = list[index].next;
-        }
-        return index;
     }
 
     function payOut(
