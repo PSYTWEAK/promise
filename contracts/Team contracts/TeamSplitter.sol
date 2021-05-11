@@ -10,16 +10,19 @@ contract PromTeamSplitter {
   using SafeERC20 for IERC20;
 
   uint256[] public pay_table;
-  uint8 public constant payee_count = 2;
-  uint16 public constant scale = 20000;
+  uint8 public constant payee_count = 7;
+  uint16 public constant scale = 100;
 
   constructor () {
 
     pay_table = [
-      pack(address(), 5000),  // 25%
-      pack(address(), 5000),  // 25%
-      pack(address(), 5000),  // 25%
-      pack(address(), 5000),  // 25%
+      pack(address(), 55),  // 55%
+      pack(address(), 20),  // 20%
+      pack(address(), 5),  // 5%
+      pack(address(), 5),  // 5%
+      pack(address(), 5),  // 5%
+      pack(address(), 5),  // 5%
+      pack(address(), 5),  // 25%
     ];
 
     uint sum;
@@ -50,8 +53,7 @@ contract PromTeamSplitter {
   }
 
   function dispatch(address tokenAddr) public {
-    IERC20 token = IERC20(tokenAddr);
-    uint256 bal = token.balanceOf(address(this));
+    uint256 bal = IERC20(tokenAddr).balanceOf(address(this));
     require(bal > 0, "no bal");
     uint256 rem = bal;
 
@@ -63,11 +65,11 @@ contract PromTeamSplitter {
       // if bal (wei) < scale/rate user receives 0
       uint256 amt = bal.mul(rate) / scale;
       rem -= amt;
-      token.safeTransfer(addr, amt);
+      IERC20(tokenAddr).safeTransfer(addr, amt);
     }
 
     (addr, rate) = unpack(pay_table[payee_count - 1]);
-    token.transfer(addr, rem);
+    IERC20(tokenAddr).safeTransfer(addr, rem);
   }
 
   function pack(address addr, uint16 rate) public pure returns (uint256) {

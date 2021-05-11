@@ -4,6 +4,8 @@ pragma solidity >=0.4.21 <0.7.0;
 import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "./Lib/SafeMath.sol";
 
+import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+
 contract PromiseCore {
     address public feeAddress;
 
@@ -60,22 +62,22 @@ contract PromiseCore {
         address jAsset,
         uint256 jAmount,
         uint256 expiry
-    ) external {
+    ) external nonReentrant {
         IERC20(assetA).transferFrom(msg.sender, address(this), cAmount.div(2));
         _createPromise(account, cAsset, cAmount, jAsset, jAmount, expiry);
     }
 
     function joinPromise(
         uint256 id,
-        address account,
-        bytes32 index
-    ) external {
-        IERC20 token = IERC20(promises[id].assetB);
-        token.transferFrom(msg.sender, address(this), promises[id].amountB.div(2));
-        _joinPromise(id, account, index);
+        address account
+        uint256 amount
+    ) external nonReentrant {
+        require(promise[id].creator != account, "Can't join your own promise")
+        IERC20(promises[id].jAsset).transferFrom(msg.sender, address(this), amount);
+        _joinPromise(id, account, amount);
     }
 
-    function payPromise(uint256 id, address account) external {
+    function payPromise(uint256 id, address account) external nonReentrant {
         require(promises[id].addrB != address(0x0), "This promise hasn't been joined yet");
         require(promises[id].time >= block.timestamp, "This promise is no longer active");
         require(account == promises[id].addrA || account == promises[id].addrB, "This account is not involved in this promise");
@@ -94,41 +96,78 @@ contract PromiseCore {
 
     function cancelPromise(
         uint256 id
-    ) external {
-        require(msg.sender == promises[id].addrA, "This account is not involved in this promise");
-        require(promises[id].addrB == address(0x0), "Promise cant be canceled once active");
+    ) external nonReentrant {
+        require(msg.sender == promises[id].creator, "This account is not involved in this promise");
         require(promises[id].executed == false, "This promise has been executed");
-        IERC20 tokenA = IERC20(promises[id].assetA);
-        tokenA.transfer(promises[id].addrA, promises[id].amountA.div(2));
+        PromData memory promData = promises[id];
+        /*      
+        Calculate how much needs to be refunded
+        this is only the capital which is not being utilised by the joiners. 
+        No joiners means all capital added by the creator is refunded.
+       */
 
-        bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
+        uint activeAmount = (promData.jDebt).mul(2).add(promData.jPaidFull)
+        uint refund = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount);
+        promises[id].cAmount = (promData.cAmount).sub(refund);
+        promises[id].jAmount = activeAmount;
+        /*      
+        delete entries from 2 linked lists
+        First, deletes from the relevant joinablePromise list so its not advertised to people anymore
+        second, deletes from the account promises if nobody joined  
+       */
+        bytes32 listId = sha256(abi.encodePacked(promData.cAsset, promData.jAsset));
         bytes32 index = sha256(abi.encodePacked(listId, id));
         deleteEntry(id, listId, index);
+        
+        if (joinerLength[id] = 0) {
         listId = sha256(abi.encodePacked(msg.sender));
         index = sha256(abi.encodePacked(listId, id))
-        deleteEntry(id, listId, index);
+        deleteEntry(id, listId, index);      
+        
+        promises[id].cExecuted = true;
+        }
 
-        promises[id].executed = true;
+        IERC20(promData.cAsset).transfer(promData.creator, refund);
         emit PromiseCanceled(msg.sender, id);
     }
 
+        /*        
+        executing a promise
+        if you are the creator pId should be the id of the promise you are referencing and jId should be 0
+        if you are a joiner, you need the pId and jId
+       */
     function executePromise(
-        uint256 id,
-    ) external {
-        require(promises[id].time <= block.timestamp, "This promise has not expired yet");
-        require(promises[id].executed == false, "This promise has been executed");
-        promises[id].executed = true;
+        uint256 pid,
+        uint256 jid
+    ) external nonReentrant {
+        require(promises[id].expiry <= block.timestamp, "This promise has not expired yet");
+        require(msg.sender == promises[pid].creator || joiners[pid][jid].joiner == msg.sender);            
+        uint amA, amB;
         PromData memory promData = promises[id];
+        if (msg.sender == promises[pid].creator) {
+            require(promises[pid].executed == false)
+            promises[id].executed = true;
+            amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
+            amB = (promData.jDebt).add(promData.jPaid)
+            payOut(uint256 amA,uint256 amB,address a,address b,);
+            bytes32 listId = sha256(abi.encodePacked(msg.sender));
+            bytes32 index = sha256(abi.encodePacked(listId, id));
+            deleteEntry(id, listId, index);
 
-        payOut(promData.amountA, promData.amountB, promData.owedA, promData.owedB, promData.addrA, promData.addrB, promData.assetA, promData.assetB);
-        bytes32 listId = sha256(abi.encodePacked(promises[id].addrA));
-        bytes32 index = sha256(abi.encodePacked(listId, id));
-        deleteEntry(id, listId, index);
-        listId = sha256(abi.encodePacked(promises[id].addrB));
-        index = sha256(abi.encodePacked(listId, id));
-        deleteEntry(id, listId, index);
+        } else {
+            require(joiners[pid][jid].executed == false)
+            joiners[pid][jid].executed = true;
+            // creator gets Debt + paid + (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount);
+            payOut(uint256 amA,uint256 amB,address a,address b,);
+            bytes32 listId = sha256(abi.encodePacked(msg.sender));
+            bytes32 index = sha256(abi.encodePacked(listId, id));
+            deleteEntry(id, listId, index);
+            
 
-        emit PromiseExecuted(msg.sender, id);
+        }
+
+
+        emit PromiseExecuted(msg.sender, pid);
     }
     function _createPromise(
         address account,
@@ -223,31 +262,16 @@ contract PromiseCore {
     function payOut(
         uint256 amA,
         uint256 amB,
-        uint256 oweA,
-        uint256 oweB,
         address a,
         address b,
-        address assA,
-        address assB
     ) internal {
         uint256 fA = amA.div(200);
         uint256 fB = amB.div(200);
+        IERC20(assA).transfer(b, amA.sub(fA));
+        IERC20(assB).transfer(a, amB.sub(fB));
+        IERC20(assA).transfer(feeAddress, fA);
+        IERC20(assB).transfer(feeAddress, fB);
 
-        if (oweA == 0 && oweB == 0) {
-            IERC20(assA).transfer(b, amA.sub(fA));
-            IERC20(assB).transfer(a, amB.sub(fB));
-            IERC20(assA).transfer(feeAddress, fA);
-            IERC20(assB).transfer(feeAddress, fB);
-        } else if (oweA == 0 && oweB > 0) {
-            IERC20(assA).transfer(a, amA);
-            IERC20(assB).transfer(a, amB);
-        } else if (oweB == 0 && oweA > 0) {
-            IERC20(assA).transfer(b, amA.div(2));
-            IERC20(assB).transfer(b, amB);
-        } else {
-            IERC20(assA).transfer(a, amA);
-            IERC20(assB).transfer(b, amB);
-        }
     }
 
     /** Get Promise Arrays
