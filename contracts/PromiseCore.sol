@@ -149,21 +149,25 @@ contract PromiseCore {
             promises[id].executed = true;
             amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
             amB = (promData.jDebt).add(promData.jPaid)
-            payOut(uint256 amA,uint256 amB,address a,address b,);
+            payOut(amA,amB, msg.sender);
             bytes32 listId = sha256(abi.encodePacked(msg.sender));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
 
         } else {
-            require(joiners[pid][jid].executed == false)
+            require(joiners[pid][jid].executed == false && joiners[pid][jid].debt == 0);
             joiners[pid][jid].executed = true;
-            // creator gets Debt + paid + (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount);
-            payOut(uint256 amA,uint256 amB,address a,address b,);
+            JoinersInfo memory joiners = joiners[pid][jid];
+            amA = ((promData.cAmount).sub(promData.cDebt)).div(promData.jAmount).mul(joiners.paid);
+            amB = 0;
+            if (promData.cDebt > 0) {
+                amB = joiners.paid;
+            }
+            payOut(amA,amB, msg.sender);
+            // to do ===========================
             bytes32 listId = sha256(abi.encodePacked(msg.sender));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
-            
-
         }
 
 
