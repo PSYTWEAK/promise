@@ -59,6 +59,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         DAI = _dai;
         prom = _prom;
         rewardsDistribution = msg.sender;
+        // change before production
         for (uint256 i; i < 3; i++) {
             promiseOptions[i].ratio = 1000 + i;
             promiseOptions[i].time = 1631019788 + i;

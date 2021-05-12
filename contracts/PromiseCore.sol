@@ -77,7 +77,7 @@ contract PromiseCore {
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
-        require(promises[id].addrB != address(0x0), "This promise hasn't been joined yet");
+        require(promises[id].addr != address(0x0), "This promise hasn't been joined yet");
         require(promises[id].time >= block.timestamp, "This promise is no longer active");
         require(account == promises[id].addrA || account == promises[id].addrB, "This account is not involved in this promise");
         PromData memory promData = promises[id];
@@ -93,7 +93,7 @@ contract PromiseCore {
         }
     }
 
-    function closePromise(
+    function closeOpenPromise(
         uint256 id
     ) external nonReentrant {
         require(msg.sender == promises[id].creator, "Only the creator can close");
@@ -104,15 +104,14 @@ contract PromiseCore {
         this is only the capital which is not being utilised by the joiners. 
         No joiners means all capital added by the creator is refunded.
        */
-
         uint activeAmount = (promData.jDebt).mul(2).add(promData.jPaidFull)
-        uint refund = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount);
+        uint refund = (promData.cAmount).sub(promData.cDebt).sub((promData.cAmount).div(promData.jAmount).mul(actAmount);)
         promises[id].cAmount = (promData.cAmount).sub(refund);
         promises[id].jAmount = activeAmount;
         /*      
         delete entries from 2 linked lists
         First, deletes from the relevant joinablePromise list so its not advertised to people anymore
-        second, deletes from the account promises if nobody joined  
+        second, deletes from the account promises if nobody joined 
        */
         bytes32 listId = sha256(abi.encodePacked(promData.cAsset, promData.jAsset));
         bytes32 index = sha256(abi.encodePacked(listId, id));
@@ -133,7 +132,8 @@ contract PromiseCore {
     /*        
         executing a promise
         if you are the creator pId should be the id of the promise you are referencing and jId should be 0
-        if you are a joiner, you need the pId and jId
+        if you are a joiner, you need the promise id (pId) and your own joiner Id (jid)
+        Checks whether you are the creator or join and then gives you the required payout.
        */
     function executePromise(
         uint256 pid,
@@ -279,7 +279,6 @@ contract PromiseCore {
         IERC20(assB).transfer(a, amB.sub(fB));
         IERC20(assA).transfer(feeAddress, fA);
         IERC20(assB).transfer(feeAddress, fB);
-
     }
 
     /** Get Promise Arrays
