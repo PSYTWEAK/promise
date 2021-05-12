@@ -97,7 +97,7 @@ contract PromiseCore {
     function cancelPromise(
         uint256 id
     ) external nonReentrant {
-        require(msg.sender == promises[id].creator, "This account is not involved in this promise");
+        require(msg.sender == promises[id].creator, "Only the creator can cancel");
         require(promises[id].executed == false, "This promise has been executed");
         PromData memory promData = promises[id];
         /*      
@@ -140,13 +140,13 @@ contract PromiseCore {
         uint256 pid,
         uint256 jid
     ) external nonReentrant {
-        require(promises[id].expiry <= block.timestamp, "This promise has not expired yet");
+        require(promises[pid].expiry <= block.timestamp, "This promise has not expired yet");
         require(msg.sender == promises[pid].creator || joiners[pid][jid].joiner == msg.sender);            
         uint amA, amB;
         PromData memory promData = promises[id];
         if (msg.sender == promises[pid].creator) {
-            require(promises[pid].executed == false)
-            promises[id].executed = true;
+            require(promises[pid].cExecuted == false && promises[pid].cDebt == 0)
+            promises[pid].executed = true;
             amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
             amB = (promData.jDebt).add(promData.jPaid)
             payOut(amA,amB, msg.sender);
@@ -164,10 +164,9 @@ contract PromiseCore {
                 amB = joiners.paid;
             }
             payOut(amA,amB, msg.sender);
-            // to do ===========================
-            bytes32 listId = sha256(abi.encodePacked(msg.sender));
-            bytes32 index = sha256(abi.encodePacked(listId, id));
-            deleteEntry(id, listId, index);
+            bytes32 listId = sha256(abi.encodePacked(id));
+            bytes32 index = sha256(abi.encodePacked(listId, msg.sender));
+            deleteEntry(joinersLength[jid], listId, entry);
         }
 
 
