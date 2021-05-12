@@ -3,8 +3,7 @@ pragma solidity >=0.4.21 <0.7.0;
 
 import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "./Lib/SafeMath.sol";
-
-import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
+import { ReentrancyGuard } from "./Lib/ReentrancyGuard.sol";
 
 contract PromiseCore {
     address public feeAddress;
@@ -131,7 +130,7 @@ contract PromiseCore {
         emit PromiseCanceled(msg.sender, id);
     }
 
-        /*        
+    /*        
         executing a promise
         if you are the creator pId should be the id of the promise you are referencing and jId should be 0
         if you are a joiner, you need the pId and jId
