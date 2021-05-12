@@ -3,7 +3,7 @@ pragma solidity >=0.4.21 <0.7.0;
 
 import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "./Lib/SafeMath.sol";
-import { ReentrancyGuard } from "./Lib/ReentrancyGuard.sol";
+import {ReentrancyGuard} from "./Lib/ReentrancyGuard.sol";
 
 contract PromiseCore {
     address public feeAddress;
@@ -93,10 +93,10 @@ contract PromiseCore {
         }
     }
 
-    function cancelPromise(
+    function closePromise(
         uint256 id
     ) external nonReentrant {
-        require(msg.sender == promises[id].creator, "Only the creator can cancel");
+        require(msg.sender == promises[id].creator, "Only the creator can close");
         require(promises[id].executed == false, "This promise has been executed");
         PromData memory promData = promises[id];
         /*      
@@ -148,7 +148,7 @@ contract PromiseCore {
             promises[pid].executed = true;
             amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
             amB = (promData.jDebt).add(promData.jPaid)
-            payOut(amA,amB, msg.sender);
+            payOut(amA,amB, msg.sender, promData.cAsset, promData.jAsset);
             bytes32 listId = sha256(abi.encodePacked(msg.sender));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
@@ -162,7 +162,7 @@ contract PromiseCore {
             if (promData.cDebt > 0) {
                 amB = joiners.paid;
             }
-            payOut(amA,amB, msg.sender);
+            payOut(amA,amB, msg.sender, promData.cAsset, promData.jAsset);
             bytes32 listId = sha256(abi.encodePacked(id));
             bytes32 index = sha256(abi.encodePacked(listId, msg.sender));
             deleteEntry(joinersLength[jid], listId, entry);
@@ -264,8 +264,9 @@ contract PromiseCore {
     function payOut(
         uint256 amA,
         uint256 amB,
-        address a,
-        address b,
+        address account,
+        address assA,
+        address assB
     ) internal {
         uint256 fA = amA.div(200);
         uint256 fB = amB.div(200);
