@@ -157,15 +157,19 @@ contract PromiseCore {
             require(joiners[pid][jid].executed == false && joiners[pid][jid].debt == 0);
             joiners[pid][jid].executed = true;
             JoinersInfo memory joiners = joiners[pid][jid];
+            // to do, subtract amounts from core promise
             amA = ((promData.cAmount).sub(promData.cDebt)).div(promData.jAmount).mul(joiners.paid);
             amB = 0;
             if (promData.cDebt > 0) {
                 amB = joiners.paid;
             }
             payOut(amA,amB, msg.sender, promData.cAsset, promData.jAsset);
-            bytes32 listId = sha256(abi.encodePacked(id));
-            bytes32 index = sha256(abi.encodePacked(listId, msg.sender));
-            deleteEntry(joinersLength[jid], listId, entry);
+            /*        
+            Deletes promise from account specific promises
+            */
+            bytes32 listId = sha256(abi.encodePacked(account));
+            bytes32 entry = sha256(abi.encodePacked(listId, id));
+            deleteEntry(pid, listId, index);
         }
 
 
