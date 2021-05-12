@@ -140,11 +140,12 @@ contract PromiseCore {
         uint256 jid
     ) external nonReentrant {
         require(promises[pid].expiry <= block.timestamp, "This promise has not expired yet");
-        require(msg.sender == promises[pid].creator || joiners[pid][jid].joiner == msg.sender);            
+        require(msg.sender == promises[pid].creator || joiners[pid][jid].joiner == msg.sender, "Message sender is not in this promise");            
         uint amA, amB;
         PromData memory promData = promises[id];
         if (msg.sender == promises[pid].creator) {
-            require(promises[pid].cExecuted == false && promises[pid].cDebt == 0)
+            require(promises[pid].cExecuted == false, "already executed");
+            require(promises[pid].cDebt == 0, "Creator didn't go through with the promise");
             promises[pid].executed = true;
             amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
             amB = (promData.jDebt).add(promData.jPaid)
@@ -154,10 +155,10 @@ contract PromiseCore {
             deleteEntry(id, listId, index);
 
         } else {
-            require(joiners[pid][jid].executed == false && joiners[pid][jid].debt == 0);
+            require(joiners[pid][jid].executed == false, "already executed");
+            require(joiners[pid][jid].debt == 0, "Joiner didn't go through with the promise");
             joiners[pid][jid].executed = true;
             JoinersInfo memory joiners = joiners[pid][jid];
-            // to do, subtract amounts from core promise
             amA = ((promData.cAmount).sub(promData.cDebt)).div(promData.jAmount).mul(joiners.paid);
             amB = 0;
             if (promData.cDebt > 0) {
