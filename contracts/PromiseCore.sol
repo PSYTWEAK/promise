@@ -76,20 +76,18 @@ contract PromiseCore {
         _joinPromise(id, account, amount);
     }
 
-    function payPromise(uint256 id, address account) external nonReentrant {
-        require(promises[id].addr != address(0x0), "This promise hasn't been joined yet");
-        require(promises[id].time >= block.timestamp, "This promise is no longer active");
-        require(account == promises[id].addrA || account == promises[id].addrB, "This account is not involved in this promise");
-        PromData memory promData = promises[id];
-        IERC20 token;
-        if (account == promData.addrA) {
-            token = IERC20(promData.assetA);
-            token.transferFrom(msg.sender, address(this), promData.amountA.div(2));
-            promises[id].owedA = 0;
-        } else if (account == promData.addrB) {
-            token = IERC20(promData.assetB);
-            token.transferFrom(msg.sender, address(this), promData.amountB.div(2));
-            promises[id].owedB = 0;
+    function payPromise(uint256 pid, uint256 jid, address account) external nonReentrant {
+        require(promises[pid].expiry <= block.timestamp, "This promise has not expired yet");
+        require(account == promises[pid].creator || joiners[pid][jid].joiner == account, "Message sender is not in this promise");            
+        if (account == promises[pid].creator) {
+            PromData memory promData = promises[pid];
+            IERC20(promData.cAsset).transferFrom(msg.sender, address(this), promData.cDebt);
+            promises[pid].cDebt = 0;
+        } else if (account == joiners[pid][jid]) { 
+            JoinersInfo memory joiners = joiners[pid][jid];
+            IERC20(promData.jAsset).transferFrom(msg.sender, address(this), joiners.debt);
+            joiners[pid][jid] = joiners[pid][jid].sub(joiners.debt);
+            promises[pid].jDebt = (promises[pid].jDebt).sub(joiners.debt);
         }
     }
 
