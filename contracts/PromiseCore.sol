@@ -20,12 +20,12 @@ contract PromiseCore {
 
     struct PromData {
         address creator;
-        address cAsset;
+        address cToken;
         uint256 cAmount;
         uint256 cDebt;
         bool cExecuted;
         bytes32 joinersInfo;
-        address jAsset;
+        address jToken;
         uint256 jAmount;
         uint256 jDebt;
         uint256 jPaidFull;
@@ -45,7 +45,7 @@ contract PromiseCore {
         bytes32 previous;
     }
 
-    event PromiseCreated(address creator, address cAsset, uint cAmount, address jAsset, uint jAmount, uint expiry);
+    event PromiseCreated(address creator, address cToken, uint cAmount, address jToken, uint jAmount, uint expiry);
     event PromiseJoined(address addrB, uint256 id, uint256 amount);
     event PromiseCanceled(address executor, uint256 id);
     event PromiseExecuted(address executor, uint256 id);
@@ -56,14 +56,14 @@ contract PromiseCore {
 
     function createPromise(
         address account,        
-        address cAsset,
+        address cToken,
         uint256 cAmount,        
-        address jAsset,
+        address jToken,
         uint256 jAmount,
         uint256 expiry
     ) external nonReentrant {
-        IERC20(assetA).transferFrom(msg.sender, address(this), cAmount.div(2));
-        _createPromise(account, cAsset, cAmount, jAsset, jAmount, expiry);
+        IERC20(cToken).transferFrom(msg.sender, address(this), cAmount.div(2));
+        _createPromise(account, cToken, cAmount, jToken, jAmount, expiry);
     }
 
     function joinPromise(
@@ -72,7 +72,7 @@ contract PromiseCore {
         uint256 amount
     ) external nonReentrant {
         require(promise[id].creator != account, "Can't join your own promise")
-        IERC20(promises[id].jAsset).transferFrom(msg.sender, address(this), amount);
+        IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), amount);
         _joinPromise(id, account, amount);
     }
 
@@ -81,11 +81,11 @@ contract PromiseCore {
         require(account == promises[pid].creator || joiners[pid][jid].joiner == account, "Message sender is not in this promise");            
         if (account == promises[pid].creator) {
             PromData memory promData = promises[pid];
-            IERC20(promData.cAsset).transferFrom(msg.sender, address(this), promData.cDebt);
+            IERC20(promData.cToken).transferFrom(msg.sender, address(this), promData.cDebt);
             promises[pid].cDebt = 0;
         } else if (account == joiners[pid][jid]) { 
             JoinersInfo memory joiners = joiners[pid][jid];
-            IERC20(promData.jAsset).transferFrom(msg.sender, address(this), joiners.debt);
+            IERC20(promData.jToken).transferFrom(msg.sender, address(this), joiners.debt);
             joiners[pid][jid] = joiners[pid][jid].sub(joiners.debt);
             promises[pid].jDebt = (promises[pid].jDebt).sub(joiners.debt);
         }
@@ -111,7 +111,7 @@ contract PromiseCore {
         First, deletes from the relevant joinablePromise list so its not advertised to people anymore
         second, deletes from the account promises if nobody joined 
        */
-        bytes32 listId = sha256(abi.encodePacked(promData.cAsset, promData.jAsset));
+        bytes32 listId = sha256(abi.encodePacked(promData.cToken, promData.jToken));
         bytes32 index = sha256(abi.encodePacked(listId, id));
         deleteEntry(id, listId, index);
         
@@ -123,7 +123,7 @@ contract PromiseCore {
         promises[id].cExecuted = true;
         }
 
-        IERC20(promData.cAsset).transfer(promData.creator, refund);
+        IERC20(promData.cToken).transfer(promData.creator, refund);
         emit PromiseCanceled(msg.sender, id);
     }
 
@@ -147,7 +147,7 @@ contract PromiseCore {
             promises[pid].executed = true;
             amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(actAmount)
             amB = (promData.jDebt).add(promData.jPaid)
-            payOut(amA,amB, msg.sender, promData.cAsset, promData.jAsset);
+            payOut(amA,amB, msg.sender, promData.cToken, promData.jToken);
             bytes32 listId = sha256(abi.encodePacked(msg.sender));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
@@ -162,7 +162,7 @@ contract PromiseCore {
             if (promData.cDebt > 0) {
                 amB = joiners.paid;
             }
-            payOut(amA,amB, msg.sender, promData.cAsset, promData.jAsset);
+            payOut(amA,amB, msg.sender, promData.cToken, promData.jToken);
             /*        
             Deletes promise from account specific promises
             */
@@ -176,18 +176,18 @@ contract PromiseCore {
     }
     function _createPromise(
         address account,
-        address cAsset,        
+        address cToken,        
         uint256 cAmount,
-        address jAsset,
+        address jToken,
         uint256 jAmount,
         uint256 expiry
     ) internal {
         require(expiry > block.timestamp.add(10 minutes), "Expiry date is in the past");
         lastId += 1;
         uint256 id = lastId;
-        promises[id] = PromData(account, cAsset, cAmount, cAmount.div(2), false, "", jAsset, jAmount, 0, expiry);
+        promises[id] = PromData(account, cToken, cAmount, cAmount.div(2), false, "", jToken, jAmount, 0, expiry);
 
-        bytes32 listId = sha256(abi.encodePacked(cAsset, jAsset));
+        bytes32 listId = sha256(abi.encodePacked(cToken, jToken));
         bytes32 entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
 
@@ -195,7 +195,7 @@ contract PromiseCore {
         entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
 
-        emit PromiseCreated(account, cAsset, cAmount, jAsset, jAmount, expiry);
+        emit PromiseCreated(account, cToken, cAmount, jToken, jAmount, expiry);
     }
 
 
@@ -226,7 +226,7 @@ contract PromiseCore {
        if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
         if (promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaidFull)) == 0) {
-           bytes32 listId = sha256(abi.encodePacked(promises[id].assetA, promises[id].assetB));
+           bytes32 listId = sha256(abi.encodePacked(promises[id].cToken, promises[id].jToken));
            deleteEntry(id, listId, index);
         }
         emit PromiseJoined(account, id, amount);
@@ -260,8 +260,8 @@ contract PromiseCore {
         length[listId] -= 1;
     }
 
-    function getPairID(address assetA, address assetB) public view returns (bytes32) {
-        return sha256(abi.encodePacked(assetA, assetB));
+    function getPairID(address cToken, address jToken) public view returns (bytes32) {
+        return sha256(abi.encodePacked(cToken, jToken));
     }
 
     function payOut(
@@ -281,53 +281,53 @@ contract PromiseCore {
 
     /** Get Promise Arrays
 
-       How to use: getPromises_Asset_Amount(), getPromises_Time_Executed_Addr(), getPromises_owed()
+       How to use: getPromises_Token_Amount(), getPromises_Time_Executed_Addr(), getPromises_owed()
        if you want promises specific to an account eg. a list of Promises 1 user is involved in.
-       input the account and true for accountPairSwitch (Doesn't matter what you put for assetA and assetB)
+       input the account and true for accountPairSwitch (Doesn't matter what you put for cToken and jToken)
 
        if you want promises specific to a pair eg. a list of Promises for ETH/DAI 
-       input false for accountPairSwitch and input the two token addresses as assetA & assetB
+       input false for accountPairSwitch and input the two token addresses as cToken & jToken
        
        **/
 
-    function getPromises_Asset_Amount(
+    function promData_PromiseId_Token_Amount(
         address account,
         bool accountPairSwitch,
-        address _assetA,
-        address _assetB
+        address _cToken,
+        address _jToken
     )
         external
         view
         returns (
-            uint256[] memory id,
-            uint256[] memory amountA,
-            uint256[] memory amountB,
-            address[] memory assetA,
-            address[] memory assetB
+            uint256[] memory PromiseId,
+            uint256[] memory cAmount,
+            uint256[] memory jAmount,
+            address[] memory cToken,
+            address[] memory jToken
         )
     {
         bytes32 listId;
         if (accountPairSwitch) {
             listId = sha256(abi.encodePacked(account));
         } else {
-            listId = sha256(abi.encodePacked(_assetA, _assetB));
+            listId = sha256(abi.encodePacked(_cToken, _jToken));
         }
         uint256 _length = length[listId];
 
-        id = new uint256[](_length);
-        amountA = new uint256[](_length);
-        amountB = new uint256[](_length);
-        assetA = new address[](_length);
-        assetB = new address[](_length);
+        promiseId = new uint256[](_length);
+        cAmount = new uint256[](_length);
+        jAmount = new uint256[](_length);
+        cToken = new address[](_length);
+        jToken = new address[](_length);
 
         uint256 i = 0;
         bytes32 index = listId;
         while (i < _length) {
-            id[i] = list[index].id;
-            amountA[i] = promises[id[i]].amountA;
-            amountB[i] = promises[id[i]].amountB;
-            assetA[i] = promises[id[i]].assetA;
-            assetB[i] = promises[id[i]].assetB;
+            promiseId[i] = list[index].id;
+            cAmount[i] = promises[id[i]].cAmount;
+            jAmount[i] = promises[id[i]].jAmount;
+            cToken[i] = promises[id[i]].cToken;
+            jToken[i] = promises[id[i]].jToken;
             index = list[index].next;
             i += 1;
         }
@@ -336,13 +336,13 @@ contract PromiseCore {
     function getPromises_Time_Executed_Addr(
         address account,
         bool accountPairSwitch,
-        address _assetA,
-        address _assetB
+        address _cToken,
+        address _jToken
     )
         external
         view
         returns (
-            uint256[] memory id,
+            uint256[] memory joinerId,
             uint256[] memory time,
             bool[] memory executed,
             address[] memory addrA,
@@ -353,7 +353,7 @@ contract PromiseCore {
         if (accountPairSwitch) {
             listId = sha256(abi.encodePacked(account));
         } else {
-            listId = sha256(abi.encodePacked(_assetA, _assetB));
+            listId = sha256(abi.encodePacked(_cToken, _jToken));
         }
         uint256 _length = length[listId];
 
@@ -379,8 +379,8 @@ contract PromiseCore {
     function getPromises_owed(
         address account,
         bool accountPairSwitch,
-        address _assetA,
-        address _assetB
+        address _cToken,
+        address _jToken
     )
         external
         view
@@ -394,7 +394,7 @@ contract PromiseCore {
         if (accountPairSwitch) {
             listId = sha256(abi.encodePacked(account));
         } else {
-            listId = sha256(abi.encodePacked(_assetA, _assetB));
+            listId = sha256(abi.encodePacked(_cToken, _jToken));
         }
         uint256 _length = length[listId];
 
