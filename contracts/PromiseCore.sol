@@ -9,7 +9,7 @@ contract PromiseCore {
     address public feeAddress;
 
     mapping(uint256 => PromData) public promises;
-    mapping(uint256 => mapping(uint256 => JoinersInfo)) public joiners;
+    mapping(uint256 => mapping(uint256 => Promjoiners)) public joiners;
     mapping(uint256 => uint256) public joinersLength;
 
     mapping(bytes32 => LinkedList) list;
@@ -24,7 +24,10 @@ contract PromiseCore {
         uint256 cAmount;
         uint256 cDebt;
         bool cExecuted;
-        bytes32 joinersInfo;
+        /*  
+        Not needed    
+        bytes32 promjoiners; 
+        */
         address jToken;
         uint256 jAmount;
         uint256 jDebt;
@@ -32,7 +35,7 @@ contract PromiseCore {
         uint256 expiry;
     }
 
-    struct JoinersInfo {
+    struct Promjoiners {
         address joiner;
         uint256 paid;
         uint256 debt;
@@ -78,20 +81,18 @@ contract PromiseCore {
 
     function payPromise(uint256 pid, uint256 jid, address account) external nonReentrant {
         require(promises[pid].expiry <= block.timestamp, "This promise has not expired yet");
-        require(account == promises[pid].creator || joiners[pid][jid].joiner == account, "Message sender is not in this promise");            
+        require(account == promises[pid].creator || joiners[pid][jid].joiner == account, "Account is not in this promise");            
         if (account == promises[pid].creator) {
-            PromData memory promData = promises[pid];
-            IERC20(promData.cToken).transferFrom(msg.sender, address(this), promData.cDebt);
+            IERC20(promises[pid].cToken).transferFrom(msg.sender, address(this), promises[pid].cDebt);
             promises[pid].cDebt = 0;
         } else if (account == joiners[pid][jid]) { 
-            JoinersInfo memory joiners = joiners[pid][jid];
-            IERC20(promData.jToken).transferFrom(msg.sender, address(this), joiners.debt);
+            IERC20(promises[pid].jToken).transferFrom(msg.sender, address(this), joiners[pid][jid]);
             joiners[pid][jid] = joiners[pid][jid].sub(joiners.debt);
             promises[pid].jDebt = (promises[pid].jDebt).sub(joiners.debt);
         }
     }
 
-    function closeOpenPromise(
+    function closePendingPromiseAmount(
         uint256 id
     ) external nonReentrant {
         require(msg.sender == promises[id].creator, "Only the creator can close");
@@ -119,10 +120,8 @@ contract PromiseCore {
         listId = sha256(abi.encodePacked(msg.sender));
         index = sha256(abi.encodePacked(listId, id))
         deleteEntry(id, listId, index);      
-        
         promises[id].cExecuted = true;
         }
-
         IERC20(promData.cToken).transfer(promData.creator, refund);
         emit PromiseCanceled(msg.sender, id);
     }
@@ -156,7 +155,7 @@ contract PromiseCore {
             require(joiners[pid][jid].executed == false, "already executed");
             require(joiners[pid][jid].debt == 0, "Joiner didn't go through with the promise");
             joiners[pid][jid].executed = true;
-            JoinersInfo memory joiners = joiners[pid][jid];
+            Promjoiners memory joiners = joiners[pid][jid];
             amA = ((promData.cAmount).sub(promData.cDebt)).div(promData.jAmount).mul(joiners.paid);
             amB = 0;
             if (promData.cDebt > 0) {
@@ -184,13 +183,10 @@ contract PromiseCore {
     ) internal {
         require(expiry > block.timestamp.add(10 minutes), "Expiry date is in the past");
         lastId += 1;
-        uint256 id = lastId;
-        promises[id] = PromData(account, cToken, cAmount, cAmount.div(2), false, "", jToken, jAmount, 0, expiry);
-
+        promises[lastId] = PromData(account, cToken, cAmount, cAmount.div(2), false, "", jToken, jAmount, 0, expiry);
         bytes32 listId = sha256(abi.encodePacked(cToken, jToken));
         bytes32 entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
-
         listId = sha256(abi.encodePacked(account));
         entry = sha256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
@@ -290,7 +286,7 @@ contract PromiseCore {
        
        **/
 
-    function promData_PromiseId_Token_Amount(
+    function promList_pid_token_amount(
         address account,
         bool accountPairSwitch,
         address _cToken,
@@ -301,8 +297,8 @@ contract PromiseCore {
         returns (
             uint256[] memory PromiseId,
             uint256[] memory cAmount,
+            address[] memory cToken,            
             uint256[] memory jAmount,
-            address[] memory cToken,
             address[] memory jToken
         )
     {
@@ -315,99 +311,19 @@ contract PromiseCore {
         uint256 _length = length[listId];
 
         promiseId = new uint256[](_length);
-        cAmount = new uint256[](_length);
-        jAmount = new uint256[](_length);
+        cAmount = new uint256[](_length);        
         cToken = new address[](_length);
+        jAmount = new uint256[](_length);
         jToken = new address[](_length);
 
         uint256 i = 0;
         bytes32 index = listId;
         while (i < _length) {
             promiseId[i] = list[index].id;
-            cAmount[i] = promises[id[i]].cAmount;
-            jAmount[i] = promises[id[i]].jAmount;
+            cAmount[i] = promises[id[i]].cAmount;            
             cToken[i] = promises[id[i]].cToken;
+            jAmount[i] = promises[id[i]].jAmount;
             jToken[i] = promises[id[i]].jToken;
-            index = list[index].next;
-            i += 1;
-        }
-    }
-
-    function getPromises_Time_Executed_Addr(
-        address account,
-        bool accountPairSwitch,
-        address _cToken,
-        address _jToken
-    )
-        external
-        view
-        returns (
-            uint256[] memory joinerId,
-            uint256[] memory time,
-            bool[] memory executed,
-            address[] memory addrA,
-            address[] memory addrB
-        )
-    {
-        bytes32 listId;
-        if (accountPairSwitch) {
-            listId = sha256(abi.encodePacked(account));
-        } else {
-            listId = sha256(abi.encodePacked(_cToken, _jToken));
-        }
-        uint256 _length = length[listId];
-
-        id = new uint256[](_length);
-        time = new uint256[](_length);
-        executed = new bool[](_length);
-        addrA = new address[](_length);
-        addrB = new address[](_length);
-
-        uint256 i = 0;
-        bytes32 index = listId;
-        while (i < _length) {
-            id[i] = list[index].id;
-            time[i] = promises[id[i]].time;
-            executed[i] = promises[id[i]].executed;
-            addrA[i] = promises[id[i]].addrA;
-            addrB[i] = promises[id[i]].addrB;
-            index = list[index].next;
-            i += 1;
-        }
-    }
-
-    function getPromises_owed(
-        address account,
-        bool accountPairSwitch,
-        address _cToken,
-        address _jToken
-    )
-        external
-        view
-        returns (
-            uint256[] memory id,
-            uint256[] memory owedA,
-            uint256[] memory owedB
-        )
-    {
-        bytes32 listId;
-        if (accountPairSwitch) {
-            listId = sha256(abi.encodePacked(account));
-        } else {
-            listId = sha256(abi.encodePacked(_cToken, _jToken));
-        }
-        uint256 _length = length[listId];
-
-        id = new uint256[](_length);
-        owedA = new uint256[](_length);
-        owedB = new uint256[](_length);
-
-        uint256 i = 0;
-        bytes32 index = listId;
-        while (i < _length) {
-            id[i] = list[index].id;
-            owedA[i] = promises[id[i]].owedA;
-            owedB[i] = promises[id[i]].owedB;
             index = list[index].next;
             i += 1;
         }
