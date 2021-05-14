@@ -413,34 +413,4 @@ contract PromiseCore {
         }
     }
 
-    /** Single Promise Data **/
-
-    function getPromiseData_Amount_Asset_Time_Executed(uint256 id)
-        external
-        view
-        returns (
-            uint256,
-            address,
-            uint256,
-            address,
-            uint256,
-            bool
-        )
-    {
-        PromData memory promData = promises[id];
-        return (promData.amountA, promData.assetA, promData.amountB, promData.assetB, promData.time, promData.executed);
-    }
-
-    function getPromiseData_Addr(uint256 id)
-        external
-        view
-        returns (
-            address,
-            address,
-        )
-    {
-        PromData memory promData = promises[id];
-        return (promData.addrA, promData.addrB);
-    }
-
 }
