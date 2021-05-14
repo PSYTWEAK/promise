@@ -286,7 +286,7 @@ contract PromiseCore {
        
        **/
 
-    function promList_pid_token_amount(
+    function promList_pId_token_amount(
         address account,
         bool accountPairSwitch,
         address _cToken,
@@ -324,6 +324,51 @@ contract PromiseCore {
             cToken[i] = promises[id[i]].cToken;
             jAmount[i] = promises[id[i]].jAmount;
             jToken[i] = promises[id[i]].jToken;
+            index = list[index].next;
+            i += 1;
+        }
+    }
+
+    
+        function promList_debt_paid_expiry(
+        address account,
+        bool accountPairSwitch,
+        address _cToken,
+        address _jToken
+    )
+        external
+        view
+        returns (
+            uint256[] memory cDebt,
+            bool[] memory cExecuted,
+            uint256[] memory jDebt,            
+            uint256[] memory jPaid,
+            uint256[] memory expiry
+        )
+    {
+        bytes32 listId;
+        if (accountPairSwitch) {
+            listId = sha256(abi.encodePacked(account));
+        } else {
+            listId = sha256(abi.encodePacked(_cToken, _jToken));
+        }
+        uint256 _length = length[listId];
+
+        cDebt = new uint256[](_length);
+        cExecuted = new bool[](_length);
+        jDebt = new uint256[](_length);
+        jPaid = new uint256[](_length);
+        expiry = new uint256[](_length);
+
+        uint256 i, id;
+        bytes32 index = listId;
+        while (i < _length) {
+            id = list[index].id;
+            cDebt[i] = promises[id].cDebt;  
+            cExecuted[i] = promises[id].cExecuted;
+            jDebt[i] = promises[id].jDebt;
+            jPaid[i] = promises[id].jPaid;
+            expiry[i] = promises[id].expiry;
             index = list[index].next;
             i += 1;
         }
