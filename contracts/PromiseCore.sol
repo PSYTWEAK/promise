@@ -1,10 +1,11 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.21 <0.7.0;
+pragma solidity >=0.4.21 <0.8.0;
+
 
 import {IERC20} from "./interfaces/IERC20.sol";
-import {SafeMath} from "./Lib/SafeMath.sol";
-import {ReentrancyGuard} from "./Lib/ReentrancyGuard.sol";
-import {UQ112x112} from "./Lib/UQ112x112.sol";
+import {SafeMath} from "./lib/SafeMath.sol";
+import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
+import {UQ112x112} from "./lib/UQ112x112.sol";
 
 contract PromiseCore {
     using SafeMath for uint256;

@@ -1,5 +1,5 @@
-
-pragma solidity ^0.8.0;
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.4.21 <0.8.0;
 
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { Math } from  "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
@@ -9,7 +9,7 @@ import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-co
 
 
 // Inheritance
-import { RewardsDistributionRecipient } from  "../Lib/RewardsDistributionRecipient.sol";
+import { RewardsDistributionRecipient } from  "../lib/RewardsDistributionRecipient.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {IPromController} from "../interfaces/IPromController.sol";
 
@@ -59,6 +59,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         DAI = _dai;
         prom = _prom;
         rewardsDistribution = msg.sender;
+        // change before production
         for (uint256 i; i < 3; i++) {
             promiseOptions[i].ratio = 1000 + i;
             promiseOptions[i].time = 1631019788 + i;
@@ -107,9 +108,9 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         require(logged[id] == false);
         logged[id] = true;
             uint amountA;
-           address assetA;
-    uint amountB;
-    address assetB;
+          address assetA;
+            uint amountB;
+          address assetB;
     uint time;
     bool executed;
     address addrA;

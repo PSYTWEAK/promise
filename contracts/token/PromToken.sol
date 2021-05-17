@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.7.0;
 
-import "./SafeMath.sol";
-import "./Ownable.sol";
+import "../lib/SafeMath.sol";
+import "../lib/Ownable.sol";
 
 contract Promise is Ownable {
     using SafeMath for uint256;
@@ -18,11 +18,7 @@ contract Promise is Ownable {
     mapping(address => mapping(address => uint256)) private _allowances;
 
     event Transfer(address indexed from, address indexed to, uint256 value);
-    event Approval(
-        address indexed owner,
-        address indexed spender,
-        uint256 value
-    );
+    event Approval(address indexed owner, address indexed spender, uint256 value);
 
     constructor() public Ownable(msg.sender) {
         _name = "Promise";
@@ -54,18 +50,11 @@ contract Promise is Ownable {
         return _balances[account];
     }
 
-    function allowance(address owner, address spender)
-        external
-        view
-        returns (uint256)
-    {
+    function allowance(address owner, address spender) external view returns (uint256) {
         return _allowances[owner][spender];
     }
 
-    function transfer(address recipient, uint256 amount)
-        external
-        returns (bool)
-    {
+    function transfer(address recipient, uint256 amount) external returns (bool) {
         _transfer(msg.sender, recipient, amount);
         return true;
     }
@@ -82,36 +71,18 @@ contract Promise is Ownable {
     ) external returns (bool) {
         _transfer(sender, recipient, amount);
         if (_allowances[msg.sender][sender] != UINT256_MAX) {
-            _approve(
-                sender,
-                msg.sender,
-                _allowances[sender][msg.sender].sub(amount)
-            );
+            _approve(sender, msg.sender, _allowances[sender][msg.sender].sub(amount));
         }
         return true;
     }
 
-    function increaseAllowance(address spender, uint256 addedValue)
-        external
-        returns (bool)
-    {
-        _approve(
-            msg.sender,
-            spender,
-            _allowances[msg.sender][spender].add(addedValue)
-        );
+    function increaseAllowance(address spender, uint256 addedValue) external returns (bool) {
+        _approve(msg.sender, spender, _allowances[msg.sender][spender].add(addedValue));
         return true;
     }
 
-    function decreaseAllowance(address spender, uint256 subtractedValue)
-        external
-        returns (bool)
-    {
-        _approve(
-            msg.sender,
-            spender,
-            _allowances[msg.sender][spender].sub(subtractedValue)
-        );
+    function decreaseAllowance(address spender, uint256 subtractedValue) external returns (bool) {
+        _approve(msg.sender, spender, _allowances[msg.sender][spender].sub(subtractedValue));
         return true;
     }
 

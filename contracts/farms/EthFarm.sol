@@ -1,5 +1,6 @@
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.4.21 <0.8.0;
 
-pragma solidity ^0.8.0;
 
 import { IERC20 } from "../interfaces/IERC20.sol";
 import { Math } from  "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
@@ -9,7 +10,7 @@ import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-co
 
 
 // Inheritance
-import { RewardsDistributionRecipient } from  "../Lib/RewardsDistributionRecipient.sol";
+import { RewardsDistributionRecipient } from  "../lib/RewardsDistributionRecipient.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {IPromController} from "../interfaces/IPromController.sol";
 

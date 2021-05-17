@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.7.0;
 
-import "./SafeMath.sol";
-import "./Ownable.sol";
+import "../lib/SafeMath.sol";
+import "../lib/Ownable.sol";
 
 contract Test is Ownable {
     using SafeMath for uint256;

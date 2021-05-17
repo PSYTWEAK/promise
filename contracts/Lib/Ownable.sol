@@ -1,7 +1,14 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.7.0;
 
-import "./IOwnershipTransferrable.sol";
+interface IOwnershipTransferrable {
+    function transferOwnership(address owner) external;
+
+    event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
+}
+
+// SPDX-License-Identifier: MIT
+pragma solidity >=0.4.21 <0.7.0;
 
 abstract contract Ownable is IOwnershipTransferrable {
     address private _owner;
@@ -21,10 +28,7 @@ abstract contract Ownable is IOwnershipTransferrable {
     }
 
     function transferOwnership(address newOwner) external override onlyOwner {
-        require(
-            newOwner != address(0),
-            "Ownable: new owner is the zero address"
-        );
+        require(newOwner != address(0), "Ownable: new owner is the zero address");
         emit OwnershipTransferred(_owner, newOwner);
         _owner = newOwner;
     }

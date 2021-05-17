@@ -2,8 +2,8 @@
 
 pragma solidity ^0.7.1;
 
-import "./lib/IERC20.sol";
-import "./lib/SafeERC20.sol";
+import "../interfaces/IERC20.sol";
+import "../lib/SafeERC20.sol";
 
 contract PromTeamSplitter {
   using SafeMath for uint256;
