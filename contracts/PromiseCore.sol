@@ -28,14 +28,10 @@ contract PromiseCore {
         uint256 cAmount;
         uint256 cDebt;
         bool cExecuted;
-        /*  
-        Not needed    
-        bytes32 promjoiners; 
-        */
         address jToken;
         uint256 jAmount;
         uint256 jDebt;
-        uint256 jPaidFull;
+        uint256 jPaid;
         uint256 expiry;
     }
 
@@ -107,7 +103,7 @@ contract PromiseCore {
         this is only the capital which is not being utilised by the joiners. 
         No joiners means all capital added by the creator is refunded.
        */
-        uint activeAmount = (promData.jDebt).mul(2).add(promData.jPaidFull)
+        uint activeAmount = (promData.jDebt).mul(2).add(promData.jPaid)
         uint refund = (promData.cAmount).sub(promData.cDebt).sub((promData.cAmount).div(promData.jAmount).mul(actAmount);)
         promises[id].cAmount = (promData.cAmount).sub(refund);
         promises[id].jAmount = activeAmount;
@@ -206,7 +202,7 @@ contract PromiseCore {
     ) internal {
         PromData memory promData = promises[id];
         require(promData.expiry > block.timestamp, "Expiry date is in the past and can't be joined");
-        require(amount <= promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaidFull)) , "Amount too high for this promise")
+        require(amount <= promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaid)) , "Amount too high for this promise")
         promises[id].jDebt += amount;
         joinersLength[id]++;
         bytes32 jid = sha256(abi.encodePacked(id, account));
@@ -225,7 +221,7 @@ contract PromiseCore {
        /*        
        if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
-        if (promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaidFull)) == 0) {
+        if (promData.jAmount.sub((promData.jDebt).mul(2).add(promData.jPaid)) == 0) {
            bytes32 listId = sha256(abi.encodePacked(promises[id].cToken, promises[id].jToken));
            bytes32 index = sha256(abi.encodePacked(listId, id));
            deleteEntry(id, listId, index);
@@ -314,7 +310,7 @@ contract PromiseCore {
         while (i < _length) {
             p = promises[id];
             id[i] = list[index].id;
-            cAmount[i] = (p[id[i]].cAmount).sub(uqdiv(p[id[i]].cAmount,p[id[i]].jAmount).mul((p[id[i]].jPaid).add(p[id[i]].jDebt)));;            
+            cAmount[i] = (p[id[i]].cAmount).sub(uqdiv(p[id[i]].cAmount,p[id[i]].jAmount).mul((p[id[i]].jPaid).add(p[id[i]].jDebt)));            
             jAmount[i] = (p[id[i]].jAmount).sub((p[id[i]].jPaid).add(p[id[i]].jDebt));
             expiry[i] = p[id[i]].expiry;
             index = list[index].next;
@@ -322,27 +318,28 @@ contract PromiseCore {
         }
     }
 
-        function accountPromises(
+    function accountPromises(
         address account,
     )
         external
         view
         returns (
             uint256[] memory id,
-            uint256[] memory jid,
             uint256[] memory debt,         
             uint256[] memory receiving,
-            uint256[] memory expiry
+            uint256[] memory expiry,
+            address[] memory tokens
         )
     {
         bytes32 listId = sha256(abi.encodePacked(account));
         uint256 _length = length[listId];
 
-        id = new uint256[](_length);
-        jid = new uint256[](_length);        
+        id = new uint256[](_length);      
         debt = new uint256[](_length);
         receiving = new uint256[](_length);
         expiry = new uint256[](_length);
+        // tokens array is twice the length because it has 2 entries added every loop
+        tokens = new address[](_length.mul(2));
 
         uint256 i
         bytes32 index = listId;
@@ -350,31 +347,21 @@ contract PromiseCore {
         while (i < _length) {
             p = promises[id];
             id[i] = list[index].id;
+            tokens[i ? i*2 : 0] = p.cToken;
+            tokens[i ? (i*2)-1 : 0] = p.jToken;
             if(p[id[i]].creator == account) {
             debt[i] = p[id[i]].cDebt;          
             receiving[i] = p[id[i]].jAmount;
-            expiry[i] = p[id[i]].expiry;
             jid[i] = 0;
             } else {
-            
-            debt[i] =        
-            receiving[i] = 
-            expiry[i] = 
+            bytes32 jid = sha256(abi.encodePacked(id[i], account));
+            debt[i] = joiners[id[i]][jid].debt; 
+            receiving[i] = uqdiv(p[id[i]].cAmount,p[id[i]].jAmount).mul((joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt))
             }
+            expiry[i] = p[id[i]].expiry;
             index = list[index].next;
             i += 1;
         }
-    }
-
-    function findJid(address account, uint id) internal view returns (uint) {
-        address _account;
-        uint i;
-        while (_account != account) {
-            joiners[id][i]
-
-        }
-
-
     }
     
 
