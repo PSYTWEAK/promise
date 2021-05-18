@@ -1,5 +1,5 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.21 <0.7.0;
+pragma solidity >=0.4.21 <0.8.0;
 
 interface IOwnershipTransferrable {
     function transferOwnership(address owner) external;
@@ -7,8 +7,7 @@ interface IOwnershipTransferrable {
     event OwnershipTransferred(address indexed previousOwner, address indexed newOwner);
 }
 
-// SPDX-License-Identifier: MIT
-pragma solidity >=0.4.21 <0.7.0;
+pragma solidity >=0.4.21 <0.8.0;
 
 abstract contract Ownable is IOwnershipTransferrable {
     address private _owner;

@@ -13,20 +13,22 @@
 // You should have received a copy of the GNU General Public License
 // along with this program.  If not, see <http://www.gnu.org/licenses/>.
 
-pragma solidity ^0.6.0;
+pragma solidity >=0.4.21 <0.8.0;
 
 interface IWETH {
+    function deposit() external payable;
 
-    function deposit() external payable; 
-    function withdraw(uint wad) external; 
-    function totalSupply() external view returns (uint); 
+    function withdraw(uint256 wad) external;
 
-    function approve(address guy, uint wad) external returns (bool); 
+    function totalSupply() external view returns (uint256);
 
-    function transfer(address dst, uint wad) external returns (bool); 
+    function approve(address guy, uint256 wad) external returns (bool);
 
-    function transferFrom(address src, address dst, uint wad)
-        external
-        returns (bool);
-    
+    function transfer(address dst, uint256 wad) external returns (bool);
+
+    function transferFrom(
+        address src,
+        address dst,
+        uint256 wad
+    ) external returns (bool);
 }
