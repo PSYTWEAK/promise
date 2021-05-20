@@ -25,19 +25,19 @@ contract PromiseCore is ReentrancyGuard {
     struct PromData {
         address creator;
         address cToken;
-        uint256 cAmount;
-        uint256 cDebt;
+        uint112 cAmount;
+        uint112 cDebt;
         bool cExecuted;
         address jToken;
-        uint256 jAmount;
-        uint256 jDebt;
-        uint256 jPaid;
-        uint256 expiry;
+        uint112 jAmount;
+        uint112 jDebt;
+        uint112 jPaid;
+        uint112 expiry;
     }
 
     struct Promjoiners {
-        uint256 paid;
-        uint256 debt;
+        uint112 paid;
+        uint112 debt;
         bool executed;
     }
 
@@ -47,8 +47,8 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 previous;
     }
 
-    event PromiseCreated(address creator, address cToken, uint256 cAmount, address jToken, uint256 jAmount, uint256 expiry);
-    event PromiseJoined(address addrB, uint256 id, uint256 amount);
+    event PromiseCreated(address creator, address cToken, uint112 cAmount, address jToken, uint112 jAmount, uint112 expiry);
+    event PromiseJoined(address addrB, uint256 id, uint112 amount);
     event PromiseCanceled(address executor, uint256 id);
     event PromiseExecuted(address executor, uint256 id);
 
@@ -59,19 +59,19 @@ contract PromiseCore is ReentrancyGuard {
     function createPromise(
         address account,
         address cToken,
-        uint256 cAmount,
+        uint112 cAmount,
         address jToken,
-        uint256 jAmount,
+        uint112 jAmount,
         uint256 expiry
     ) external nonReentrant {
-        IERC20(cToken).transferFrom(msg.sender, address(this), cAmount.div(2));
+        IERC20(cToken).transferFrom(msg.sender, address(this), cAmount / 2);
         _createPromise(account, cToken, cAmount, jToken, jAmount, expiry);
     }
 
     function joinPromise(
         uint256 id,
         address account,
-        uint256 amount
+        uint112 amount
     ) external nonReentrant {
         require(promises[id].creator != account, "Can't join your own promise");
         IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), amount);
@@ -88,7 +88,7 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][jid].debt > 0, "debt is 0");
             IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), joiners[id][jid].debt);
             joiners[id][jid].debt = 0;
-            promises[id].jDebt = (promises[id].jDebt).sub(joiners[id][jid].debt);
+            promises[id].jDebt -= joiners[id][jid].debt;
         }
     }
 
@@ -100,10 +100,10 @@ contract PromiseCore is ReentrancyGuard {
         this is only the capital which is not being utilised by the joiners. 
         No joiners means all capital added by the creator is refunded.
        */
-        uint256 x = (promData.jDebt).mul(2).add(promData.jPaid);
-        uint256 refund = (promData.cAmount).sub(promData.cDebt).sub((promData.cAmount).div(promData.jAmount).mul(x));
-        promises[id].cAmount = (promData.cAmount).sub(refund);
-        promises[id].jAmount = x;
+        uint112 x = uint112(promData.jDebt).mul(2) + promData.jPaid;
+        uint256 refund = uint256(promData.cAmount).sub(promData.cDebt).sub(uint256(UQ112x112.encode(promData.cAmount).uqdiv(promData.jAmount)).mul(x));
+        promises[id].cAmount = uint112(uint256(promData.cAmount).sub(refund));
+        promises[id].jAmount = uint112(x);
         /*      
         delete entries from 2 linked lists
         First, deletes from the relevant joinablePromise list so its not advertised to people anymore
@@ -131,16 +131,16 @@ contract PromiseCore is ReentrancyGuard {
        */
     function executePromise(uint256 id, address account) external nonReentrant {
         require(promises[id].expiry <= block.timestamp, "This promise has not expired yet");
-        uint256 amA;
-        uint256 amB;
+        uint112 amA;
+        uint112 amB;
         PromData memory promData = promises[id];
         if (account == promises[id].creator) {
             require(promises[id].cExecuted == false, "already executed");
             require(promises[id].cDebt == 0, "Creator didn't go through with the promise");
             promises[id].cExecuted = true;
-            uint256 x = (promData.jDebt).mul(2).add(promData.jPaid);
-            amA = (promData.cAmount).sub((promData.cAmount).div(promData.jAmount)).mul(x);
-            amB = (promData.jDebt).add(promData.jPaid);
+            uint112 x = uint112(promData.jDebt).mul(2).add(promData.jPaid);
+            amA = uint112(promData.cAmount).sub(uint112(UQ112x112.encode(promData.cAmount).uqdiv(promData.jAmount))).mul(x);
+            amB = uint112(promData.jDebt).add(promData.jPaid);
             payOut(amA, amB, account, promData.cToken, promData.jToken);
             bytes32 listId = sha256(abi.encodePacked(account));
             bytes32 index = sha256(abi.encodePacked(listId, id));
@@ -171,9 +171,9 @@ contract PromiseCore is ReentrancyGuard {
     function _createPromise(
         address account,
         address cToken,
-        uint256 cAmount,
+        uint112 cAmount,
         address jToken,
-        uint256 jAmount,
+        uint112 jAmount,
         uint256 expiry
     ) internal {
         require(expiry > block.timestamp.add(10 minutes), "Expiry date is in the past");
@@ -192,7 +192,7 @@ contract PromiseCore is ReentrancyGuard {
     function _joinPromise(
         uint256 id,
         address account,
-        uint256 amount
+        uint112 amount
     ) internal {
         PromData memory promData = promises[id];
         require(promData.expiry > block.timestamp, "Expiry date is in the past and can't be joined");
@@ -252,14 +252,14 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function payOut(
-        uint256 amA,
-        uint256 amB,
+        uint112 amA,
+        uint112 amB,
         address account,
         address assA,
         address assB
     ) internal {
-        uint256 fA = amA.div(200);
-        uint256 fB = amB.div(200);
+        uint112 fA = amA.div(200);
+        uint112 fB = amB.div(200);
         IERC20(assA).transfer(account, amA.sub(fA));
         IERC20(assB).transfer(account, amB.sub(fB));
         IERC20(assA).transfer(feeAddress, fA);
@@ -282,8 +282,8 @@ contract PromiseCore is ReentrancyGuard {
         view
         returns (
             uint256[] memory id,
-            uint256[] memory cAmount,
-            uint256[] memory jAmount,
+            uint112[] memory cAmount,
+            uint112[] memory jAmount,
             uint256[] memory expiry
         )
     {
@@ -291,8 +291,8 @@ contract PromiseCore is ReentrancyGuard {
         uint256 _length = length[listId];
 
         id = new uint256[](_length);
-        cAmount = new uint256[](_length);
-        jAmount = new uint256[](_length);
+        cAmount = new uint112[](_length);
+        jAmount = new uint112[](_length);
         expiry = new uint256[](_length);
 
         uint256 i;
@@ -301,7 +301,7 @@ contract PromiseCore is ReentrancyGuard {
         while (i < _length) {
             p = promises[id[i]];
             id[i] = list[index].id;
-            cAmount[i] = (p.cAmount).sub(uint256(UQ112x112.uqdiv(uint224(p.cAmount), uint112(p.jAmount))).mul((p.jPaid).add(p.jDebt)));
+            cAmount[i] = (p.cAmount).sub(uint112(UQ112x112.uqdiv(uint224(p.cAmount), uint112(p.jAmount))).mul((p.jPaid).add(p.jDebt)));
             jAmount[i] = (p.jAmount).sub((p.jPaid).add(p.jDebt));
             expiry[i] = p.expiry;
             index = list[index].next;
@@ -314,8 +314,8 @@ contract PromiseCore is ReentrancyGuard {
         view
         returns (
             uint256[] memory id,
-            uint256[] memory debt,
-            uint256[] memory receiving,
+            uint112[] memory debt,
+            uint112[] memory receiving,
             uint256[] memory expiry,
             address[] memory tokens
         )
@@ -324,8 +324,8 @@ contract PromiseCore is ReentrancyGuard {
         uint256 _length = length[listId];
 
         id = new uint256[](_length);
-        debt = new uint256[](_length);
-        receiving = new uint256[](_length);
+        debt = new uint112[](_length);
+        receiving = new uint112[](_length);
         expiry = new uint256[](_length);
         // tokens array is twice the length because it has 2 entries added every loop
         tokens = new address[](_length.mul(2));
@@ -344,7 +344,7 @@ contract PromiseCore is ReentrancyGuard {
             } else {
                 bytes32 jid = sha256(abi.encodePacked(id[i], account));
                 debt[i] = joiners[id[i]][jid].debt;
-                receiving[i] = uint256(uint224(UQ112x112.encode(uint112(p.cAmount)).uqdiv(uint112(p.jAmount)))).mul((joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt));
+                receiving[i] = (uint224(UQ112x112.encode(p.cAmount).uqdiv(p.jAmount))).mul((joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt));
             }
 
             expiry[i] = p.expiry;
