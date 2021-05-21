@@ -47,7 +47,15 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 previous;
     }
 
-    event PromiseCreated(address creator, address cToken, uint256 cAmount, address jToken, uint256 jAmount, uint256 expiry);
+    event PromiseCreated(
+        address creator,
+        address cToken,
+        uint256 cAmount,
+        address jToken,
+        uint256 jAmount,
+        uint256 expiry
+    );
+
     event PromiseJoined(address addrB, uint256 id, uint256 amount);
     event PromiseCanceled(address executor, uint256 id);
     event PromiseExecuted(address executor, uint256 id);
@@ -64,7 +72,8 @@ contract PromiseCore is ReentrancyGuard {
         uint112 jAmount,
         uint256 expiry
     ) external nonReentrant {
-        IERC20(cToken).transferFrom(msg.sender, address(this), cAmount / 2);
+        require(cAmount / 2 != 0 && jAmount / 2 != 0, "Amount too small");
+        IERC20(cToken).transferFrom(msg.sender, address(this), uint256(cAmount).div(2));
         _createPromise(account, cToken, cAmount, jToken, jAmount, expiry);
     }
 
@@ -86,8 +95,8 @@ contract PromiseCore is ReentrancyGuard {
             bytes32 jid = sha256(abi.encodePacked(id, account));
             require(joiners[id][jid].debt > 0, "debt is 0");
             IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), joiners[id][jid].debt);
-            joiners[id][jid].debt = 0;
             promises[id].jDebt -= joiners[id][jid].debt;
+            joiners[id][jid].debt = 0;
         }
     }
 
@@ -177,7 +186,18 @@ contract PromiseCore is ReentrancyGuard {
     ) internal {
         require(expiry > block.timestamp.add(10 minutes), "Expiry date is in the past");
         lastId += 1;
-        promises[lastId] = PromData(account, cToken, cAmount, uint256(cAmount).div(2), false, jToken, jAmount, 0, 0, expiry);
+        promises[lastId] = PromData(
+            account,
+            cToken,
+            cAmount,
+            uint256(cAmount).div(2),
+            false,
+            jToken,
+            jAmount,
+            0,
+            0,
+            expiry
+        );
         bytes32 listId = sha256(abi.encodePacked(cToken, jToken));
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
@@ -349,7 +369,9 @@ contract PromiseCore is ReentrancyGuard {
             } else {
                 bytes32 jid = sha256(abi.encodePacked(id[i], account));
                 debt[i] = joiners[id[i]][jid].debt;
-                receiving[i] = (promiseRatio(p.cAmount, p.jAmount)).mul((joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt));
+                receiving[i] = (promiseRatio(p.cAmount, p.jAmount)).mul(
+                    (joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt)
+                );
             }
 
             expiry[i] = p.expiry;
