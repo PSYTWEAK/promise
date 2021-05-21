@@ -96,7 +96,9 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][jid].debt > 0, "debt is 0");
             IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), joiners[id][jid].debt);
             promises[id].jDebt -= joiners[id][jid].debt;
+            promises[id].jPaid += uint112(uint256(joiners[id][jid].debt).mul(2));
             joiners[id][jid].debt = 0;
+            joiners[id][jid].paid = uint112(uint256(joiners[id][jid].debt).mul(2));
         }
     }
 
@@ -109,7 +111,7 @@ contract PromiseCore is ReentrancyGuard {
         No joiners means all capital added by the creator is refunded.
        */
         uint256 x = uint256((p.jDebt).mul(2) + p.jPaid);
-        uint256 refund = uint256(p.cAmount).sub(p.cDebt).sub(promiseRatio(p.cAmount, p.jAmount)).mul(x);
+        uint256 refund = uint256(p.cAmount).sub(p.cDebt).sub(promiseRatio(p.cAmount, p.jAmount).mul(x));
         promises[id].cAmount -= uint112(refund);
         promises[id].jAmount = uint112(x);
         /*      
