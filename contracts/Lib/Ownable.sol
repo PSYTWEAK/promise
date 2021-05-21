@@ -9,7 +9,7 @@ interface IOwnershipTransferrable {
 
 pragma solidity >=0.4.21 <0.8.0;
 
-abstract contract Ownable is IOwnershipTransferrable {
+contract Ownable is IOwnershipTransferrable {
     address private _owner;
 
     constructor(address owner) public {

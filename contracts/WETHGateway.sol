@@ -7,8 +7,9 @@ import {IPromController} from "./interfaces/IPromController.sol";
 import {SafeMath} from "./Lib/SafeMath.sol";
 
 contract WETHGateway {
-    address public immutable WETH;
-    address public immutable prom;
+    using SafeMath for uint256;
+    address public WETH;
+    address public prom;
 
     constructor(address _WETH, address _prom) public {
         WETH = _WETH;
@@ -26,7 +27,7 @@ contract WETHGateway {
         uint256 time
     ) external payable {
         IWETH(WETH).deposit{value: msg.value}();
-        IPromController(prom).createPromise(account, msg.value.mul(2), WETH, amountB, assetB, time);
+        IPromController(prom).createPromise(account, (msg.value).mul(2), WETH, amountB, assetB, time);
     }
 
     function joinPromiseWithETH(uint256 id, address account) external payable {

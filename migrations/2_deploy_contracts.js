@@ -3,8 +3,6 @@ const PromToken = artifacts.require("./token/PromToken.sol");
 const TestToken = artifacts.require("./token/TestToken.sol");
 const Helper = artifacts.require("./Helper.sol");
 const WETHGateway = artifacts.require("./WETHGateway.sol");
-const DaiFarm = artifacts.require("./farms/DaiFarm.sol");
-const EthFarm = artifacts.require("./farms/EthFarm.sol");
 
 var uni = "0x7a250d5630B4cF539739dF2C5dAcb4c659F2488D";
 var dai = "0xff795577d9ac8bd7d90ee22b6c1703490b6512fd";
@@ -17,8 +15,8 @@ module.exports = async function (deployer, accounts) {
     "0x1E67cC1199F312d495694D99C57a3667fBb6FCe5"
   );
 
-  await deployer.deploy(Token1);
-  await deployer.deploy(Token2);
+  await deployer.deploy(PromToken);
+  await deployer.deploy(TestToken);
 
   var prom = await PromController.deployed();
   var promToken = await PromToken.deployed();
@@ -30,14 +28,14 @@ module.exports = async function (deployer, accounts) {
   await deployer.deploy(WETHGateway, prom.address, weth);
   var wethGateway = await WETHGateway.deployed();
 
-  await deployer.deploy(DaiFarm, 
+  /*   await deployer.deploy(DaiFarm, 
     accounts[0],
     address _rewardsDistribution,
     address _rewardsToken,
     address _stakingToken,
     addres _weth,
     uint256[] ratio,
-    uint256[] time);
+    uint256[] time); */
   var helper = await Helper.deployed();
 
   await promToken.approve(prom.address, "100000000000000000000000");
@@ -48,15 +46,6 @@ module.exports = async function (deployer, accounts) {
       "0x1E67cC1199F312d495694D99C57a3667fBb6FCe5",
       "10000000000000000000",
       promToken.address,
-      "10000000000000000000",
-      token2.address,
-      "1628246300"
-    );
-  }
-
-  for (var i; i < 5; i++) {
-    await wethGateway.createPromiseWithETH(
-      accounts[0],
       "10000000000000000000",
       token2.address,
       "1628246300"
