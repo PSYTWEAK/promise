@@ -16,7 +16,7 @@ contract PromiseCore is ReentrancyGuard {
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
     mapping(uint256 => uint256) public joinersLength;
 
-    mapping(bytes32 => LinkedList) list;
+    mapping(bytes32 => LinkedList) public list;
     mapping(bytes32 => bytes32) tail;
     mapping(bytes32 => uint256) length;
 
@@ -273,8 +273,13 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 index
     ) internal {
         require(list[index].id == id, "incorrect index");
-        list[list[index].previous].next = list[index].next;
-        list[list[index].next].previous = list[index].previous;
+        if (list[index].previous != "") {
+            list[list[index].previous].next = list[index].next;
+        }
+        if (list[index].next != "") {
+            list[list[index].next].previous = list[index].previous;
+        }
+        list[index].id = 0;
         length[listId] -= 1;
     }
 
