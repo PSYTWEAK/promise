@@ -79,7 +79,6 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
-        require(promises[id].expiry <= block.timestamp, "This promise has not expired yet");
         if (account == promises[id].creator) {
             IERC20(promises[id].cToken).transferFrom(msg.sender, address(this), promises[id].cDebt);
             promises[id].cDebt = 0;
@@ -213,6 +212,7 @@ contract PromiseCore is ReentrancyGuard {
             addEntry(id, listId, entry);
         }
         uint112 amount = uint112(uint256(_amount).div(2));
+        require(amount > 0, "Amount too small");
         promises[id].jDebt += amount;
         joiners[id][jid].debt += amount;
         joiners[id][jid].paid += amount;
