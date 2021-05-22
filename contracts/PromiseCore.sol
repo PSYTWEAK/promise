@@ -273,11 +273,14 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 index
     ) internal {
         require(list[index].id == id, "incorrect index");
-        if (list[index].previous != "") {
-            list[list[index].previous].next = list[index].next;
-        }
         if (list[index].next != "") {
             list[list[index].next].previous = list[index].previous;
+        }
+        if (list[index].previous != "") {
+            list[list[index].previous].next = list[index].next;
+            if (tail[listId] == index) {
+                tail[listId] = list[index].previous;
+            }
         }
         list[index].id = 0;
         length[listId] -= 1;
