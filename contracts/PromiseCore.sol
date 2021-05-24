@@ -97,8 +97,8 @@ contract PromiseCore is ReentrancyGuard {
             IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), joiners[id][jid].debt);
             promises[id].jDebt -= joiners[id][jid].debt;
             promises[id].jPaid += uint112(uint256(joiners[id][jid].debt).mul(2));
-            joiners[id][jid].debt = 0;
             joiners[id][jid].paid = uint112(uint256(joiners[id][jid].debt).mul(2));
+            joiners[id][jid].debt = 0;
         }
     }
 
@@ -384,7 +384,7 @@ contract PromiseCore is ReentrancyGuard {
             } else {
                 bytes32 jid = sha256(abi.encodePacked(id[i], account));
                 j = joiners[id[i]][jid];
-                debt[i] = joiners[id[i]][jid].debt;
+                debt[i] = j.debt;
                 receiving[i] = shareCal(p.cAmount, p.jAmount, (j.paid).add(j.debt));
             }
             expiry[i] = p.expiry;
