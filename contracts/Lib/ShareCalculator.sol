@@ -33,6 +33,6 @@ library ShareCalculator {
     }
 
     function decode(uint224 x) public view returns (uint256 z) {
-        z = x / Q112;
+        z = (x >> 112);
     }
 }

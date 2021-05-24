@@ -4,11 +4,11 @@ pragma solidity >=0.4.21 <0.8.0;
 import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "./lib/SafeMath.sol";
 import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
-import {UQ112x112} from "./lib/UQ112x112.sol";
+import {ShareCalculator} from "./lib/ShareCalculator.sol";
 
 contract PromiseCore is ReentrancyGuard {
     using SafeMath for uint256;
-    using UQ112x112 for uint224;
+    using ShareCalculator for uint224;
 
     address public feeAddress;
 
@@ -16,7 +16,7 @@ contract PromiseCore is ReentrancyGuard {
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
     mapping(uint256 => uint256) public joinersLength;
 
-    mapping(bytes32 => LinkedList) list;
+    mapping(bytes32 => LinkedList) public list;
     mapping(bytes32 => bytes32) tail;
     mapping(bytes32 => uint256) length;
 
@@ -111,7 +111,7 @@ contract PromiseCore is ReentrancyGuard {
         No joiners means all capital added by the creator is refunded.
        */
         uint256 x = uint256((p.jDebt).mul(2) + p.jPaid);
-        uint256 refund = uint256(p.cAmount).sub(p.cDebt).sub(promiseRatio(p.cAmount, p.jAmount).mul(x));
+        uint256 refund = uint256(p.cAmount).sub(p.cDebt).sub(shareCal(p.cAmount, p.jAmount, x));
         promises[id].cAmount -= uint112(refund);
         promises[id].jAmount = uint112(x);
         /*      
@@ -149,35 +149,33 @@ contract PromiseCore is ReentrancyGuard {
             require(promises[id].cDebt == 0, "Creator didn't go through with the promise");
             promises[id].cExecuted = true;
             uint256 x = uint256((p.jDebt).mul(2).add(p.jPaid));
-            amA = uint256(p.cAmount).sub(promiseRatio(p.cAmount, p.jAmount)).mul(x);
+            amA = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, x));
             amB = uint256(p.jDebt).add(p.jPaid);
             payOut(amA, amB, account, p.cToken, p.jToken);
             bytes32 listId = sha256(abi.encodePacked(account));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
-            emit PromiseExecuted(account, id);
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
-            if (joiners[id][jid].paid > 0, "Joiner hasn't paid") {
-                 require(joiners[id][jid].executed == false, "already executed");
-                 require(joiners[id][jid].debt == 0, "Joiner didn't go through with the promise");
-                 joiners[id][jid].executed = true;
-                 Promjoiners memory j = joiners[id][jid];
-                 amA = (uint256(p.cAmount).sub(p.cDebt)).div(p.jAmount).mul(j.paid);
-                 amB = 0;
-                 if (p.cDebt > 0) {
-                    amB = j.paid;
-                 }
-                 payOut(amA, amB, account, p.cToken, p.jToken);
-                 /*        
-                 Deletes promise from account specific promises
-                 */
-                 bytes32 listId = sha256(abi.encodePacked(account));
-                 bytes32 index = sha256(abi.encodePacked(listId, id));
-                 deleteEntry(id, listId, index);
-                 emit PromiseExecuted(account, id);
+            require(joiners[id][jid].executed == false, "already executed");
+            require(joiners[id][jid].debt == 0, "Joiner didn't go through with the promise");
+            joiners[id][jid].executed = true;
+            Promjoiners memory joiners = joiners[id][jid];
+            amA = (uint256(p.cAmount).sub(p.cDebt)).div(p.jAmount).mul(joiners.paid);
+            amB = 0;
+            if (p.cDebt > 0) {
+                amB = joiners.paid;
             }
+            payOut(amA, amB, account, p.cToken, p.jToken);
+            /*        
+            Deletes promise from account specific promises
+            */
+            bytes32 listId = sha256(abi.encodePacked(account));
+            bytes32 index = sha256(abi.encodePacked(listId, id));
+            deleteEntry(id, listId, index);
         }
+
+        emit PromiseExecuted(account, id);
     }
 
     function _createPromise(
@@ -342,7 +340,7 @@ contract PromiseCore is ReentrancyGuard {
         while (i < _length) {
             p = promises[id[i]];
             id[i] = list[index].id;
-            cAmount[i] = uint256(p.cAmount).sub(promiseRatio(p.cAmount, p.jAmount)).mul((p.jPaid).add(p.jDebt));
+            cAmount[i] = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, (p.jPaid).add(p.jDebt)));
             jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt));
             expiry[i] = p.expiry;
             index = list[index].next;
@@ -374,6 +372,7 @@ contract PromiseCore is ReentrancyGuard {
         uint256 i;
         bytes32 index = listId;
         PromData memory p;
+        Promjoiners memory j;
         while (i < _length) {
             id[i] = list[index].id;
             p = promises[id[i]];
@@ -384,19 +383,21 @@ contract PromiseCore is ReentrancyGuard {
                 receiving[i] = p.jAmount;
             } else {
                 bytes32 jid = sha256(abi.encodePacked(id[i], account));
+                j = joiners[id[i]][jid];
                 debt[i] = joiners[id[i]][jid].debt;
-                receiving[i] = (promiseRatio(p.cAmount, p.jAmount)).mul(
-                    (joiners[id[i]][jid].paid).add(joiners[id[i]][jid].debt)
-                );
+                receiving[i] = shareCal(p.cAmount, p.jAmount, (j.paid).add(j.debt));
             }
-
             expiry[i] = p.expiry;
             index = list[index].next;
             i += 1;
         }
     }
 
-    function promiseRatio(uint112 x, uint112 y) internal pure returns (uint256 z) {
-        z = uint256(UQ112x112.encode(x).uqdiv(y));
+    function shareCal(
+        uint112 a,
+        uint112 b,
+        uint256 c
+    ) public view returns (uint256 z) {
+        z = ShareCalculator.divMul(a, b, uint224(c));
     }
 }
