@@ -338,8 +338,8 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 index = listId;
         PromData memory p;
         while (i < _length) {
-            p = promises[id[i]];
             id[i] = list[index].id;
+            p = promises[id[i]];
             cAmount[i] = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, (p.jPaid).add(p.jDebt)));
             jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt));
             expiry[i] = p.expiry;
