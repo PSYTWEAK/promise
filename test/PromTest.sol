@@ -21,14 +21,14 @@ contract PromTest {
 
     function createPromise() public {
         uint256 balance = IERC20(token1).balanceOf(address(this));
-        uint256 amount = 1000;
+        uint112 amount = 1000;
         approve();
         IPromiseCore(promiseCore).createPromise(
             address(this),
-            amount,
             token1,
-            1000,
+            amount,
             token2,
+            amount,
             block.timestamp + 11 minutes
         );
     }

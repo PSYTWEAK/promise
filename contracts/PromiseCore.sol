@@ -16,7 +16,7 @@ contract PromiseCore is ReentrancyGuard {
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
     mapping(uint256 => uint256) public joinersLength;
 
-    mapping(bytes32 => LinkedList) public list;
+    mapping(bytes32 => LinkedList) list;
     mapping(bytes32 => bytes32) tail;
     mapping(bytes32 => uint256) length;
 
@@ -155,27 +155,29 @@ contract PromiseCore is ReentrancyGuard {
             bytes32 listId = sha256(abi.encodePacked(account));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
+            emit PromiseExecuted(account, id);
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
-            require(joiners[id][jid].executed == false, "already executed");
-            require(joiners[id][jid].debt == 0, "Joiner didn't go through with the promise");
-            joiners[id][jid].executed = true;
-            Promjoiners memory joiners = joiners[id][jid];
-            amA = (uint256(p.cAmount).sub(p.cDebt)).div(p.jAmount).mul(joiners.paid);
-            amB = 0;
-            if (p.cDebt > 0) {
-                amB = joiners.paid;
+            if (joiners[id][jid].paid > 0, "Joiner hasn't paid") {
+                 require(joiners[id][jid].executed == false, "already executed");
+                 require(joiners[id][jid].debt == 0, "Joiner didn't go through with the promise");
+                 joiners[id][jid].executed = true;
+                 Promjoiners memory j = joiners[id][jid];
+                 amA = (uint256(p.cAmount).sub(p.cDebt)).div(p.jAmount).mul(j.paid);
+                 amB = 0;
+                 if (p.cDebt > 0) {
+                    amB = j.paid;
+                 }
+                 payOut(amA, amB, account, p.cToken, p.jToken);
+                 /*        
+                 Deletes promise from account specific promises
+                 */
+                 bytes32 listId = sha256(abi.encodePacked(account));
+                 bytes32 index = sha256(abi.encodePacked(listId, id));
+                 deleteEntry(id, listId, index);
+                 emit PromiseExecuted(account, id);
             }
-            payOut(amA, amB, account, p.cToken, p.jToken);
-            /*        
-            Deletes promise from account specific promises
-            */
-            bytes32 listId = sha256(abi.encodePacked(account));
-            bytes32 index = sha256(abi.encodePacked(listId, id));
-            deleteEntry(id, listId, index);
         }
-
-        emit PromiseExecuted(account, id);
     }
 
     function _createPromise(
