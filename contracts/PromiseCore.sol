@@ -88,16 +88,20 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
+        require(promises[id].expiry > block.timestamp, "Promise expired");
         if (account == promises[id].creator) {
+            require(promises[id].cExecuted, "Already executed");
+            require(promises[id].cDebt > 0, "debt is 0");
             IERC20(promises[id].cToken).transferFrom(msg.sender, address(this), promises[id].cDebt);
             promises[id].cDebt = 0;
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
             require(joiners[id][jid].debt > 0, "debt is 0");
+            require(joiners[id][jid].executed == false, "Already executed");
             IERC20(promises[id].jToken).transferFrom(msg.sender, address(this), joiners[id][jid].debt);
             promises[id].jDebt -= joiners[id][jid].debt;
-            promises[id].jPaid += uint112(uint256(joiners[id][jid].debt).mul(2));
-            joiners[id][jid].paid = uint112(uint256(joiners[id][jid].debt).mul(2));
+            promises[id].jPaid += uint112((joiners[id][jid].debt).mul(2));
+            joiners[id][jid].paid = uint112((joiners[id][jid].debt).mul(2));
             joiners[id][jid].debt = 0;
         }
     }
@@ -160,11 +164,11 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][jid].executed == false, "already executed");
             require(joiners[id][jid].debt == 0, "Joiner didn't go through with the promise");
             joiners[id][jid].executed = true;
-            Promjoiners memory joiners = joiners[id][jid];
-            amA = (uint256(p.cAmount).sub(p.cDebt)).div(p.jAmount).mul(joiners.paid);
+            Promjoiners memory j = joiners[id][jid];
+            amA = shareCal(p.cAmount, p.jAmount, (j.paid).sub(j.debt));
             amB = 0;
             if (p.cDebt > 0) {
-                amB = joiners.paid;
+                amB = j.paid;
             }
             payOut(amA, amB, account, p.cToken, p.jToken);
             /*        
@@ -217,7 +221,7 @@ contract PromiseCore is ReentrancyGuard {
     ) internal {
         PromData memory p = promises[id];
         bytes32 jid = sha256(abi.encodePacked(id, account));
-        uint256 leftOver = uint256(p.jAmount).sub((p.jDebt).mul(2).add(p.jPaid));
+        uint256 leftOver = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt.mul(2)));
         require(p.expiry > block.timestamp, "Expiry date is in the past and can't be joined");
         require(_amount <= leftOver, "Amount too high for this promise");
         /*        
@@ -245,11 +249,13 @@ contract PromiseCore is ReentrancyGuard {
         /*        
        if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
+        leftOver = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt.mul(2)));
         if (leftOver == 0) {
-            bytes32 listId = sha256(abi.encodePacked(promises[id].cToken, promises[id].jToken));
+            listId = sha256(abi.encodePacked(promises[id].cToken, promises[id].jToken));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
         }
+
         emit PromiseJoined(account, id, amount);
     }
 
@@ -344,7 +350,7 @@ contract PromiseCore is ReentrancyGuard {
             id[i] = list[index].id;
             p = promises[id[i]];
             cAmount[i] = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, (p.jPaid).add(p.jDebt.mul(2))));
-            jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt).mul(2));
+            jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt.mul(2)));
             expiry[i] = p.expiry;
             index = list[index].next;
             i += 1;
