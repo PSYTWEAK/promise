@@ -90,7 +90,7 @@ contract PromiseCore is ReentrancyGuard {
     function payPromise(uint256 id, address account) external nonReentrant {
         require(promises[id].expiry > block.timestamp, "Promise expired");
         if (account == promises[id].creator) {
-            require(promises[id].cExecuted, "Already executed");
+            require(promises[id].cExecuted == false, "Already executed");
             require(promises[id].cDebt > 0, "debt is 0");
             IERC20(promises[id].cToken).transferFrom(msg.sender, address(this), promises[id].cDebt);
             promises[id].cDebt = 0;
