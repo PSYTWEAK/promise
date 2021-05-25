@@ -233,8 +233,11 @@ contract PromiseCore is ReentrancyGuard {
             entry = sha256(abi.encodePacked(listId, id));
             addEntry(id, listId, entry);
         }
-        uint112 amount = uint112(uint256(_amount).div(2));
+        uint256 amount = uint256(_amount).div(2);
         require(amount > 0, "Amount too small");
+        /*        
+         amount is not added to jPaid on join as this payment is irrelevant until debt is paid in full
+       */
         promises[id].jDebt += amount;
         joiners[id][jid].debt += amount;
         joiners[id][jid].paid += amount;
@@ -340,8 +343,8 @@ contract PromiseCore is ReentrancyGuard {
         while (i < _length) {
             id[i] = list[index].id;
             p = promises[id[i]];
-            cAmount[i] = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, (p.jPaid).add(p.jDebt)));
-            jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt));
+            cAmount[i] = uint256(p.cAmount).sub(shareCal(p.cAmount, p.jAmount, (p.jPaid).add(p.jDebt.mul(2))));
+            jAmount[i] = uint256(p.jAmount).sub((p.jPaid).add(p.jDebt).mul(2));
             expiry[i] = p.expiry;
             index = list[index].next;
             i += 1;
