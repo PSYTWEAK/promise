@@ -159,6 +159,9 @@ contract PromiseCore is ReentrancyGuard {
             bytes32 listId = sha256(abi.encodePacked(account));
             bytes32 index = sha256(abi.encodePacked(listId, id));
             deleteEntry(id, listId, index);
+            listId = sha256(abi.encodePacked(promises[id].cToken, promises[id].jToken));
+            index = sha256(abi.encodePacked(listId, id));
+            deleteEntry(id, listId, index);
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
             require(joiners[id][jid].executed == false, "already executed");
@@ -281,8 +284,7 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 listId,
         bytes32 index
     ) internal {
-        if (list[listId].id != id) {
-            require(list[index].id == id, "incorrect index");
+        if (list[index].id == id) {
             if (list[index].next != "") {
                 list[list[index].next].previous = list[index].previous;
             }
@@ -292,7 +294,9 @@ contract PromiseCore is ReentrancyGuard {
                     tail[listId] = list[index].previous;
                 }
             }
-        } else {
+            list[index].previous = "";
+            list[index].next = "";
+        } else if (list[listId].id != id) {
             list[listId].id = list[list[listId].next].id;
             list[listId].next = list[list[listId].next].next;
         }
