@@ -157,7 +157,11 @@ contract PromiseCore is ReentrancyGuard {
             amountA = shareCal(p.creatorAmount, p.joinerAmount, (j.amountPaid).sub(j.outstandingDebt));
             amountB = 0;
             if (p.creatorDebt > 0) {
-                amountB = j.amountPaid;
+                amountB = shareCal(
+                    uint112((j.amountPaid).sub(j.outstandingDebt)),
+                    uint112(p.joinerPaidFull),
+                    p.creatorDebt
+                );
             }
             payOut(amountA, amountB, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
@@ -206,12 +210,9 @@ contract PromiseCore is ReentrancyGuard {
     ) internal {
         PromData memory p = promises[id];
         bytes32 jid = sha256(abi.encodePacked(id, account));
-        uint256 leftOverCreatorAmount =
-            uint256(p.creatorAmount).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-            );
+        uint256 leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
-        require(_amount <= leftOverCreatorAmount, "Amount too high for this promise");
+        require(_amount <= leftOverjoinerAmount, "Amount too high for this promise");
         /*        
        Adding entries to two linked lists:
        firstly adding this account and info (amountPaid, outstandingDebt, executed) to the list of joiner info for this promise
@@ -237,10 +238,9 @@ contract PromiseCore is ReentrancyGuard {
         /*        
          if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
-        leftOverCreatorAmount = uint256(p.creatorAmount).sub(
-            shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-        );
-        if (leftOverCreatorAmount == 0) {
+        p = promises[id];
+        leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+        if (leftOverjoinerAmount == 0) {
             deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         }
 
