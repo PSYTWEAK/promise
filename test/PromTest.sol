@@ -35,11 +35,7 @@ contract PromTest {
 
     function joinerJoinAllPromises() public {
         uint256[] memory id;
-        uint256[] memory debt;
-        uint256[] memory receiving;
-        uint256[] memory expiry;
-        address[] memory tokens;
-        (id, debt, receiving, expiry, tokens) = IPromiseCore(promiseCore).accountPromises(address(this));
+        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(token1, token2);
         for (uint256 i = 0; i < id.length; i++) {
             joinPromise(id[i], joiner);
             joinPromise(id[i], joiner2);
@@ -48,11 +44,7 @@ contract PromTest {
 
     function executeAllPromisesForCreatorNJoiner() public {
         uint256[] memory id;
-        uint256[] memory debt;
-        uint256[] memory receiving;
-        uint256[] memory expiry;
-        address[] memory tokens;
-        (id, debt, receiving, expiry, tokens) = IPromiseCore(promiseCore).accountPromises(address(this));
+        (id, , , , ) = IPromiseCore(promiseCore).accountPromises(address(this));
         for (uint256 i = 0; i < id.length; i++) {
             _executePromise(id[i], address(this));
             _executePromise(id[i], joiner);
@@ -62,11 +54,7 @@ contract PromTest {
 
     function payAllPromisesForCreatoreNJoiner() public {
         uint256[] memory id;
-        uint256[] memory debt;
-        uint256[] memory receiving;
-        uint256[] memory expiry;
-        address[] memory tokens;
-        (id, debt, receiving, expiry, tokens) = IPromiseCore(promiseCore).accountPromises(address(this));
+        (id, , , , ) = IPromiseCore(promiseCore).accountPromises(address(this));
         for (uint256 i = 0; i < id.length; i++) {
             _payPromise(id[i], address(this));
             _payPromise(id[i], joiner);
@@ -75,7 +63,7 @@ contract PromTest {
     }
 
     function createPromise() public {
-        uint256 balance = IERC20(token1).balanceOf(address(this));
+        uint256 balanceBefore = IERC20(token1).balanceOf(address(this));
         approve();
         IPromiseCore(promiseCore).createPromise(
             address(this),
@@ -83,8 +71,10 @@ contract PromTest {
             amount,
             token2,
             amount,
-            block.timestamp + 10 seconds
+            block.timestamp + 40 seconds
         );
+        uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
+        require(balanceBefore - balanceAfter == amount / 2, "wrong amount taken");
     }
 
     function joinPromise(uint256 id, address account) public {
@@ -108,7 +98,7 @@ contract PromTest {
         IERC20(token2).approve(promiseCore, 2**256 - 1);
     }
 
-    function getListId(address account) public view returns (bytes32 z) {
+    function getListId(address account) public pure returns (bytes32 z) {
         z = sha256(abi.encodePacked(account));
     }
 
@@ -124,16 +114,16 @@ contract PromTest {
     }
 
     // encode a uint112 as a UQ112x112
-    function encode(uint112 y) public view returns (uint224 z) {
+    function encode(uint112 y) public pure returns (uint224 z) {
         z = uint224(y) * Q112; // never overflows
     }
 
     // divide a UQ112x112 by a uint112, returning a UQ112x112
-    function div(uint224 x, uint112 y) public view returns (uint224 z) {
+    function div(uint224 x, uint112 y) public pure returns (uint224 z) {
         z = x / uint224(y);
     }
 
-    function mul(uint224 x, uint224 y) public view returns (uint224 z) {
+    function mul(uint224 x, uint224 y) public pure returns (uint224 z) {
         z = x * y;
         if (x == 0) {
             z = 0;
