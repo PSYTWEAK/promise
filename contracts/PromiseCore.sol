@@ -2,9 +2,9 @@
 pragma solidity >=0.4.21 <0.8.0;
 
 import {IERC20} from "./interfaces/IERC20.sol";
-import {SafeMath} from "./lib/SafeMath.sol";
+import {SafeMath} from "./lib/math/SafeMath.sol";
 import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
-import {ShareCalculator} from "./lib/ShareCalculator.sol";
+import {ShareCalculator} from "./lib/math/ShareCalculator.sol";
 
 contract PromiseCore is ReentrancyGuard {
     using SafeMath for uint256;
@@ -38,7 +38,7 @@ contract PromiseCore is ReentrancyGuard {
     struct Promjoiners {
         uint256 amountPaid;
         uint256 outstandingDebt;
-        bool executed;
+        bool hasExecuted;
     }
 
     struct LinkedList {
@@ -98,11 +98,11 @@ contract PromiseCore is ReentrancyGuard {
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
             require(joiners[id][jid].outstandingDebt > 0, "OutstandingDebt is 0");
-            require(joiners[id][jid].executed == false, "Already executed");
+            require(joiners[id][jid].hasExecuted == false, "Already executed");
             IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), joiners[id][jid].outstandingDebt);
             promises[id].joinerDebt -= joiners[id][jid].outstandingDebt;
             promises[id].joinerPaidFull += joiners[id][jid].outstandingDebt.mul(2);
-            joiners[id][jid].amountPaid = uint112((joiners[id][jid].outstandingDebt).mul(2));
+            joiners[id][jid].amountPaid = joiners[id][jid].outstandingDebt.mul(2);
             joiners[id][jid].outstandingDebt = 0;
         }
         emit PromisePaid(account, id);
@@ -150,9 +150,9 @@ contract PromiseCore is ReentrancyGuard {
             deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         } else {
             bytes32 jid = sha256(abi.encodePacked(id, account));
-            require(joiners[id][jid].executed == false, "Already executed");
+            require(joiners[id][jid].hasExecuted == false, "Already executed");
             require(joiners[id][jid].outstandingDebt == 0, "Joiner didn't go through with the promise");
-            joiners[id][jid].executed = true;
+            joiners[id][jid].hasExecuted = true;
             Promjoiners memory j = joiners[id][jid];
             amountA = shareCal(p.creatorAmount, p.joinerAmount, (j.amountPaid).sub(j.outstandingDebt));
             amountB = 0;
@@ -206,7 +206,10 @@ contract PromiseCore is ReentrancyGuard {
     ) internal {
         PromData memory p = promises[id];
         bytes32 jid = sha256(abi.encodePacked(id, account));
-        uint256 leftOverCreatorAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+        uint256 leftOverCreatorAmount =
+            uint256(p.creatorAmount).sub(
+                shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+            );
         require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
         require(_amount <= leftOverCreatorAmount, "Amount too high for this promise");
         /*        
@@ -234,7 +237,9 @@ contract PromiseCore is ReentrancyGuard {
         /*        
          if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
-        leftOverCreatorAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+        leftOverCreatorAmount = uint256(p.creatorAmount).sub(
+            shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+        );
         if (leftOverCreatorAmount == 0) {
             deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         }
@@ -264,7 +269,7 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 listId,
         bytes32 index
     ) internal {
-        if (list[index].id == id) {
+        if (list[listId].id != id) {
             if (list[index].next != "") {
                 list[list[index].next].previous = list[index].previous;
             }
@@ -276,11 +281,12 @@ contract PromiseCore is ReentrancyGuard {
             }
             list[index].previous = "";
             list[index].next = "";
-        } else if (list[listId].id != id) {
+            length[listId] -= 1;
+        } else {
             list[listId].id = list[list[listId].next].id;
             list[listId].next = list[list[listId].next].next;
+            length[listId] -= 1;
         }
-        length[listId] -= 1;
     }
 
     function payOut(
@@ -290,8 +296,8 @@ contract PromiseCore is ReentrancyGuard {
         address assetA,
         address assetB
     ) internal {
-        uint256 feeA = amountA.div(200);
-        uint256 feeB = amountB.div(200);
+        uint256 feeA = amountA.mul(2).div(100);
+        uint256 feeB = amountB.mul(2).div(100);
         IERC20(assetA).transfer(account, amountA.sub(feeA));
         IERC20(assetB).transfer(account, amountB.sub(feeB));
         IERC20(assetA).transfer(feeAddress, feeA);
