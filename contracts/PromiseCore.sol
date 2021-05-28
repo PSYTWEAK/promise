@@ -141,9 +141,7 @@ contract PromiseCore is ReentrancyGuard {
             require(promises[id].hasCreatorExecuted == false, "Already executed");
             require(promises[id].creatorDebt == 0, "Creator didn't go through with the promise");
             promises[id].hasCreatorExecuted = true;
-            amountA = uint256(p.creatorAmount).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, p.joinerPaidFull.add(p.joinerDebt.mul(2)))
-            );
+            amountA = uint256(p.creatorAmount).sub(shareCal(p.creatorAmount, p.joinerAmount, p.joinerPaidFull));
             amountB = uint256(p.joinerDebt).add(p.joinerPaidFull);
             payOut(amountA, amountB, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
@@ -394,7 +392,7 @@ contract PromiseCore is ReentrancyGuard {
             tokens[i > 0 ? (i * 2) - 1 : 0] = p.joinerToken;
             if (p.creator == account) {
                 outstandingDebt[i] = p.creatorDebt;
-                receiving[i] = p.joinerAmount;
+                receiving[i] = uint256(p.joinerDebt).add(p.joinerPaidFull);
             } else {
                 bytes32 jid = sha256(abi.encodePacked(id[i], account));
                 j = joiners[id[i]][jid];
