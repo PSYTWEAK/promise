@@ -269,7 +269,7 @@ contract PromiseCore is ReentrancyGuard {
         bytes32 listId,
         bytes32 index
     ) internal {
-        if (list[listId].id != id) {
+        if (list[listId].id != id && list[index].id == id) {
             if (list[index].next != "") {
                 list[list[index].next].previous = list[index].previous;
             }
@@ -282,7 +282,7 @@ contract PromiseCore is ReentrancyGuard {
             list[index].previous = "";
             list[index].next = "";
             length[listId] -= 1;
-        } else {
+        } else if (list[listId].id == id) {
             list[listId].id = list[list[listId].next].id;
             list[listId].next = list[list[listId].next].next;
             length[listId] -= 1;

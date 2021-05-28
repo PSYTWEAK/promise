@@ -7,6 +7,7 @@ import "./IERC20.sol";
 
 contract PromTest {
     uint224 constant Q112 = 2**112;
+    uint112 nonce;
     address public token1;
     address public token2;
     address public promiseCore;
@@ -21,6 +22,13 @@ contract PromTest {
 
     function setPromiseCore(address p) public {
         promiseCore = p;
+    }
+
+    function testEverything() public {
+        createPromise();
+        joinerJoinAllPromises();
+        payAllPromisesForCreatoreNJoiner();
+        executeAllPromisesForCreatorNJoiner();
     }
 
     function TestCreateJoinPay() public {
@@ -44,11 +52,19 @@ contract PromTest {
 
     function executeAllPromisesForCreatorNJoiner() public {
         uint256[] memory id;
-        (id, , , , ) = IPromiseCore(promiseCore).accountPromises(address(this));
+        uint256[] memory receiving;
+
+        (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(address(this));
         for (uint256 i = 0; i < id.length; i++) {
+            uint256 balanceBefore = checkBalance(token2);
             _executePromise(id[i], address(this));
             _executePromise(id[i], joiner);
             _executePromise(id[i], joiner2);
+            uint256 balanceAfter = checkBalance(token2);
+            require(
+                balanceBefore - balanceAfter == receiving[i] - ((receiving[i] * 2) / 100),
+                "balance after execute is incorrect"
+            );
         }
     }
 
@@ -65,16 +81,17 @@ contract PromTest {
     function createPromise() public {
         uint256 balanceBefore = IERC20(token1).balanceOf(address(this));
         approve();
+        uint112 randomAmount = uint112(randomNumber());
         IPromiseCore(promiseCore).createPromise(
             address(this),
             token1,
-            amount,
+            randomAmount,
             token2,
-            amount,
+            uint112(randomNumber()),
             block.timestamp + 40 seconds
         );
         uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
-        require(balanceBefore - balanceAfter == amount / 2, "wrong amount taken");
+        require(balanceBefore - balanceAfter == randomAmount / 2, "wrong amount taken");
     }
 
     function joinPromise(uint256 id, address account) public {
@@ -96,6 +113,10 @@ contract PromTest {
     function approve() public {
         IERC20(token1).approve(promiseCore, 2**256 - 1);
         IERC20(token2).approve(promiseCore, 2**256 - 1);
+    }
+
+    function checkBalance(address token) public view returns (uint256 z) {
+        z = IERC20(token).balanceOf(address(this));
     }
 
     function getListId(address account) public pure returns (bytes32 z) {
@@ -132,5 +153,11 @@ contract PromTest {
 
     function decode(uint224 x) public view returns (uint256 z) {
         z = (x >> 112);
+    }
+
+    function randomNumber() public returns (uint256) {
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % 1e18;
+        nonce++;
+        return randomNumber;
     }
 }
