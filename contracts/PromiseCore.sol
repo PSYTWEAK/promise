@@ -84,7 +84,7 @@ contract PromiseCore is ReentrancyGuard {
         uint112 amount
     ) external nonReentrant {
         require(promises[id].creator != account, "Can't join your own promise");
-        IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), amount);
+        IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), uint256(amount).div(2));
         _joinPromise(id, account, amount);
     }
 
