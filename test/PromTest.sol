@@ -11,9 +11,19 @@ contract PromTest {
     address public token1;
     address public token2;
     address public promiseCore;
-    uint112 amount = 1000;
-    address joiner = address(0x5B38Da6a701c568545dCfcB03FcB875f56beddC4);
+    uint112 amount = 10000;
+    address joiner = address(0x0A098Eda01Ce92ff4A4CCb7A4fFFb5A43EBC70DC);
     address joiner2 = address(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2);
+
+    constructor(
+        address _promiseCore,
+        address _t1,
+        address _t2
+    ) {
+        promiseCore = _promiseCore;
+        token1 = _t1;
+        token2 = _t2;
+    }
 
     function setTokens(address t1, address t2) public {
         token1 = t1;
@@ -24,46 +34,115 @@ contract PromTest {
         promiseCore = p;
     }
 
-    function testEverything() public {
+    // Promise is created, creator joins, joiner and joiner 2 join the promise with half of active amount each
+    // everyone pays, everyone executes
+    function testEverything1() public {
         createPromise();
-        joinerJoinAllPromises();
+        joinersJoinAllPromises(amount / 2, amount / 2);
         payAllPromisesForCreatoreNJoiner();
-        executeAllPromisesForCreatorNJoiner();
+        executeAllPromises();
+    }
+
+    // Promise is created, creator joins, joiner and joiner 2 join the promise with none full amounts
+    // everyone pays, everyone executes
+    function testEverything2() public {
+        createPromise();
+        joinersJoinAllPromises(amount / 4, amount / 2);
+        payAllPromisesForCreatoreNJoiner();
+        executeAllPromises();
+    }
+
+    // Promise is created, creator joins, joiner and joiner 2 join the promise with none full amounts
+    // everyone pays execpt joiner, everyone executes
+    function testEverything3() public {
+        createPromise();
+        joinersJoinAllPromises(amount / 4, amount / 2);
+        paySomePromisesForCreatoreNJoiner();
+        executeSomePromises();
+    }
+
+    function hasLeftOver() public view returns (bool) {
+        uint256 bal = checkBalance(token1, promiseCore) + checkBalance(token2, promiseCore);
+        return bal > 0;
     }
 
     function TestCreateJoinPay() public {
         createPromise();
-        joinerJoinAllPromises();
+        joinersJoinAllPromises(amount / 2, amount / 2);
         payAllPromisesForCreatoreNJoiner();
     }
 
     function TestExecute() public {
-        executeAllPromisesForCreatorNJoiner();
+        executeAllPromises();
     }
 
-    function joinerJoinAllPromises() public {
+    function joinersJoinAllPromises(uint112 _amount, uint112 _amount2) public {
         uint256[] memory id;
         (id, , , ) = IPromiseCore(promiseCore).joinablePromises(token1, token2);
         for (uint256 i = 0; i < id.length; i++) {
-            joinPromise(id[i], joiner);
-            joinPromise(id[i], joiner2);
+            joinPromise(id[i], joiner, _amount);
+            joinPromise(id[i], joiner2, _amount2);
         }
     }
 
-    function executeAllPromisesForCreatorNJoiner() public {
+    function executeAllPromises() public {
         uint256[] memory id;
         uint256[] memory receiving;
 
         (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(address(this));
         for (uint256 i = 0; i < id.length; i++) {
-            uint256 balanceBefore = checkBalance(token2);
+            uint256 balanceBeforeCreator = checkBalance(token2, address(this));
             _executePromise(id[i], address(this));
-            _executePromise(id[i], joiner);
-            _executePromise(id[i], joiner2);
-            uint256 balanceAfter = checkBalance(token2);
+            uint256 balanceAfterCreator = checkBalance(token2, address(this));
             require(
-                balanceBefore - balanceAfter == receiving[i] - ((receiving[i] * 2) / 100),
-                "balance after execute is incorrect"
+                balanceAfterCreator - balanceBeforeCreator == receiving[i] - ((receiving[i] * 2) / 100),
+                "incorrect amount received - creator"
+            );
+        }
+        (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(joiner);
+        for (uint256 i = 0; i < id.length; i++) {
+            uint256 balanceBeforeJoiner = checkBalance(token1, joiner);
+            _executePromise(id[i], joiner);
+            uint256 balanceAfterJoiner = checkBalance(token1, joiner);
+            require(
+                balanceAfterJoiner - balanceBeforeJoiner == receiving[i] - ((receiving[i] * 2) / 100),
+                "incorrect amount received - joiner"
+            );
+        }
+        (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(joiner2);
+        for (uint256 i = 0; i < id.length; i++) {
+            uint256 balanceBeforeJoiner2 = checkBalance(token1, joiner2);
+            _executePromise(id[i], joiner2);
+            uint256 balanceAfterJoiner2 = checkBalance(token1, joiner2);
+            require(
+                balanceAfterJoiner2 - balanceBeforeJoiner2 == receiving[i] - ((receiving[i] * 2) / 100),
+                "incorrect amount received - joiner2"
+            );
+        }
+    }
+
+    function executeSomePromises() public {
+        uint256[] memory id;
+        uint256[] memory receiving;
+
+        (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(address(this));
+        for (uint256 i = 0; i < id.length; i++) {
+            uint256 balanceBeforeCreator = checkBalance(token2, address(this));
+            _executePromise(id[i], address(this));
+            uint256 balanceAfterCreator = checkBalance(token2, address(this));
+            require(
+                balanceAfterCreator - balanceBeforeCreator == receiving[i] - ((receiving[i] * 2) / 100),
+                "incorrect amount received - creator"
+            );
+        }
+        (id, , receiving, , ) = IPromiseCore(promiseCore).accountPromises(joiner2);
+        for (uint256 i = 0; i < id.length; i++) {
+            uint256 balanceBeforeJoiner2 = checkBalance(token1, joiner2);
+            _executePromise(id[i], joiner2);
+            uint256 balanceAfterJoiner2 = checkBalance(token1, joiner2);
+            require(
+                balanceAfterJoiner2 - balanceBeforeJoiner2 == receiving[i] - ((receiving[i] * 2) / 100),
+                "incorrect amount received - joiner2"
             );
         }
     }
@@ -78,24 +157,36 @@ contract PromTest {
         }
     }
 
+    function paySomePromisesForCreatoreNJoiner() public {
+        uint256[] memory id;
+        (id, , , , ) = IPromiseCore(promiseCore).accountPromises(address(this));
+        for (uint256 i = 0; i < id.length; i++) {
+            _payPromise(id[i], address(this));
+            _payPromise(id[i], joiner2);
+        }
+    }
+
     function createPromise() public {
         uint256 balanceBefore = IERC20(token1).balanceOf(address(this));
         approve();
-        uint112 randomAmount = uint112(randomNumber());
         IPromiseCore(promiseCore).createPromise(
             address(this),
             token1,
-            randomAmount,
+            amount,
             token2,
-            uint112(randomNumber()),
+            amount,
             block.timestamp + 40 seconds
         );
         uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
-        require(balanceBefore - balanceAfter == randomAmount / 2, "wrong amount taken");
+        require(balanceBefore - balanceAfter == amount / 2, "wrong amount taken");
     }
 
-    function joinPromise(uint256 id, address account) public {
-        IPromiseCore(promiseCore).joinPromise(id, account, amount / 2);
+    function joinPromise(
+        uint256 id,
+        address account,
+        uint112 _amount
+    ) public {
+        IPromiseCore(promiseCore).joinPromise(id, account, _amount);
     }
 
     function closePending(uint256 id) public {
@@ -115,8 +206,8 @@ contract PromTest {
         IERC20(token2).approve(promiseCore, 2**256 - 1);
     }
 
-    function checkBalance(address token) public view returns (uint256 z) {
-        z = IERC20(token).balanceOf(address(this));
+    function checkBalance(address token, address account) public view returns (uint256 z) {
+        z = IERC20(token).balanceOf(account);
     }
 
     function getListId(address account) public pure returns (bytes32 z) {
@@ -156,8 +247,8 @@ contract PromTest {
     }
 
     function randomNumber() public returns (uint256) {
-        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % 1e18;
+        uint256 randomNumber = uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % 7437589437;
         nonce++;
-        return randomNumber;
+        return 10000;
     }
 }
