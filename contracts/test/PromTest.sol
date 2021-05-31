@@ -89,7 +89,8 @@ contract PromTest {
     }
 
     /* creating a promise with contract as creator
-    joining promise with alice and bob fragmented amounts each leaving an active amount left
+    joining promise with alice and bob fragmented amounts but bob joins twice
+    each leaving an active amount left
     paying promise for alice and bob */
     function scenario4() public {
         approve();
@@ -98,6 +99,7 @@ contract PromTest {
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 10);
         joinPromise(currentId, bob, uint112(joinerAmount) / 7);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 9);
         payPromise(currentId, alice);
         payPromise(currentId, bob);
     }
@@ -106,6 +108,33 @@ contract PromTest {
     function scenario4Execution() public {
         executePromise(currentId, alice);
         executePromise(currentId, bob);
+    }
+
+    function scenario5() public {
+        createPromise();
+    }
+
+    function scenario5JoiningAndPaying(address account) public {
+        uint256 joinerAmount;
+        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        joinPromise(currentId, account, uint112(joinerAmount) / 100);
+        payPromise(currentId, account);
+    }
+
+    function scenario5JoiningAndNotPaying(address account) public {
+        uint256 joinerAmount;
+        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        joinPromise(currentId, account, uint112(joinerAmount) / 100);
+    }
+
+    // executes promises for alice and bob
+    function scenario5Execution(address account) public {
+        executePromise(currentId, account);
+    }
+
+    // executes promises for alice and bob
+    function scenario5ForCreator() public {
+        executePromise(currentId, address(this));
     }
 
     function createPromise() public {

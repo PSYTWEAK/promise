@@ -38,4 +38,14 @@ contract("PromCore", async (accounts) => {
     await promTester.scenario4();
     await promTester.scenario4Execution();
   });
+  it("Scenario Five - Creator makes promise, lots of users join, some pay and some execute", async () => {
+    await promTester.scenario5();
+    for (var i = 0; i < 50; i = i + 2) {
+      await promTester.scenario5JoiningAndPaying(accounts[i]);
+      await promTester.scenario5JoiningAndNotPaying(accounts[i + 2]);
+    }
+    for (var i = 0; i < 50; i = i++) {
+      await promTester.scenario5Execution(accounts[i]);
+    }
+  });
 });
