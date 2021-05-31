@@ -163,7 +163,11 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][joinerId].outstandingDebt == 0, "Joiner didn't go through with the promise");
             joiners[id][joinerId].hasExecuted = true;
             Promjoiners memory j = joiners[id][joinerId];
-            amountA = shareCal(p.creatorAmount, p.joinerAmount, (j.amountPaid).sub(j.outstandingDebt));
+            amountA = shareCal(
+                uint112(uint256(p.creatorAmount).sub(p.creatorDebt)),
+                p.joinerAmount,
+                (j.amountPaid).sub(j.outstandingDebt)
+            );
             amountB = 0;
             if (p.creatorDebt > 0) {
                 amountB = shareCal(
@@ -337,7 +341,12 @@ contract PromiseCore is ReentrancyGuard {
         z = ShareCalculator.divMul(a, b, uint224(c));
     }
 
-    function joinablePromises(address _creatorToken, address _joinerToken)
+    function joinablePromises(
+        address _creatorToken,
+        address _joinerToken /* ,
+        uint256 toCreatorTokenJoinerTokenRatio,
+        uint256 fromCreatorTokenJoinerTokenRatio */
+    )
         external
         view
         returns (
