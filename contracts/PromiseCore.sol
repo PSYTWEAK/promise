@@ -75,7 +75,14 @@ contract PromiseCore is ReentrancyGuard {
     ) external nonReentrant {
         require(creatorAmount / 2 != 0 && joinerAmount / 2 != 0, "Amount too small");
         IERC20(creatorToken).transferFrom(msg.sender, address(this), uint256(creatorAmount).div(2));
-        _createPromise(account, creatorToken, creatorAmount, joinerToken, joinerAmount, expirationTimestamp);
+        _createPromise(
+            account,
+            creatorToken,
+            uint112(uint256(creatorAmount).div(2).mul(2)),
+            joinerToken,
+            uint112(uint256(joinerAmount).div(2).mul(2)),
+            expirationTimestamp
+        );
     }
 
     function joinPromise(
@@ -85,11 +92,11 @@ contract PromiseCore is ReentrancyGuard {
     ) external nonReentrant {
         require(promises[id].creator != account, "Can't join your own promise");
         IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), uint256(amount).div(2));
-        _joinPromise(id, account, amount);
+        _joinPromise(id, account, uint112(uint256(amount).div(2).mul(2)));
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
-        require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
+        // require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
         if (account == promises[id].creator) {
             require(promises[id].hasCreatorExecuted == false, "Already executed");
             require(promises[id].creatorDebt > 0, "OutstandingDebt is 0");
@@ -133,7 +140,7 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function executePromise(uint256 id, address account) external nonReentrant {
-        require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
+        // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
         uint256 amountA;
         uint256 amountB;
         PromData memory p = promises[id];
@@ -177,7 +184,7 @@ contract PromiseCore is ReentrancyGuard {
         uint112 joinerAmount,
         uint256 expirationTimestamp
     ) internal {
-        require(expirationTimestamp > block.timestamp.add(10 minutes), "expirationTimestamp date is in the past");
+        //require(expirationTimestamp > block.timestamp.add(10 minutes), "expirationTimestamp date is in the past");
         lastId += 1;
         promises[lastId] = PromData(
             account,
@@ -209,7 +216,7 @@ contract PromiseCore is ReentrancyGuard {
         PromData memory p = promises[id];
         bytes32 jid = sha256(abi.encodePacked(id, account));
         uint256 leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-        require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
+        //require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
         require(_amount <= leftOverjoinerAmount, "Amount too high for this promise");
         /*        
        Adding entries to two linked lists:
@@ -294,8 +301,8 @@ contract PromiseCore is ReentrancyGuard {
         address assetA,
         address assetB
     ) internal {
-        uint256 feeA = amountA.mul(2).div(100);
-        uint256 feeB = amountB.mul(2).div(100);
+        uint256 feeA = shareCal(uint112(amountA), 100, 2);
+        uint256 feeB = shareCal(uint112(amountB), 100, 2);
         IERC20(assetA).transfer(account, amountA.sub(feeA));
         IERC20(assetB).transfer(account, amountB.sub(feeB));
         IERC20(assetA).transfer(feeAddress, feeA);

@@ -1,10 +1,10 @@
 // SPDX-License-Identifier: MIT
-pragma solidity >=0.4.21 <0.7.0;
+pragma solidity >=0.4.21 <0.8.0;
 
 import "../lib/math/SafeMath.sol";
 import "../lib/Ownable.sol";
 
-contract Promise is Ownable {
+contract PromiseToken is Ownable {
     using SafeMath for uint256;
 
     uint256 constant UINT256_MAX = ~uint256(0);

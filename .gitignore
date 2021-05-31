@@ -2,6 +2,9 @@
 /node_modules
 /.pnp
 .pnp.js
+.DS_Store
+#truffle
 truffle-config
 truffle-config.js
 # json for contracts
+.prettierrc.json

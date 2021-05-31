@@ -1,23 +1,41 @@
 const PromiseCore = artifacts.require("./PromiseCore.sol");
-const Token1 = artifacts.require("./token/Token1.sol");
-const Token2 = artifacts.require("./token/Token2.sol");
-const Helper = artifacts.require("./Helper.sol");
+const PromiseToken = artifacts.require("./token/PromiseToken.sol");
+const TestToken = artifacts.require("./token/TestToken.sol");
+const PromTest = artifacts.require("./test/PromTest.sol");
+const ShareCalulator = artifacts.require("./lib/math/ShareCalculator.sol");
 
-contract("PromCore", (accounts) => {
+contract("PromCore", async (accounts) => {
   let prom, token1, token2, promTester;
-
-  before("creating promises", async () => {
+  before("Set up", async () => {
     prom = await PromiseCore.new(accounts[0]);
-    token1 = await Token1.new();
-    token2 = await Token2.new();
-    promTester = await promTester.new();
-    promTester.setTokens(token1.address, token2.address);
-    promTester.setPromiseCore(prom.address);
+    token1 = await PromiseToken.new();
+    token2 = await TestToken.new();
+    promTester = await PromTest.new(
+      prom.address,
+      token1.address,
+      token2.address
+    );
+    await token1.mint(promTester.address, "8438438473848345454343454354", {
+      from: accounts[0],
+    });
+    await token2.mint(promTester.address, "3487584937589454544758487954", {
+      from: accounts[0],
+    });
   });
-  it("Test 1 create promises", () => {
-    promTester.createPromise().catch((err) => console.log(err));
+  it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay and all 3 execute", async () => {
+    await promTester.scenario1();
+    await promTester.scenario1Execution();
   });
-  it("Test 2 join all 3 promises with 2 joiners ", () => {
-    promTester.joinerJoinAllPromises().catch((err) => console.log(err));
+  it("Scenario Two - Creator makes promise, alice and bob join fractions each, all 3 pay and 3 execute", async () => {
+    await promTester.scenario2();
+    await promTester.scenario2Execution();
+  });
+  it("Scenario Three - Creator makes promise, alice and bob join fractions each, 2 pay alice doesn't and 2 execute", async () => {
+    await promTester.scenario3();
+    await promTester.scenario3Execution();
+  });
+  it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
+    await promTester.scenario4();
+    await promTester.scenario4Execution();
   });
 });

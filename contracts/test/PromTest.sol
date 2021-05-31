@@ -1,8 +1,8 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity >=0.7.0 <0.9.0;
-import "../contracts/interfaces/IPromiseCore.sol";
-import "../contracts/interfaces/IERC20.sol";
+import "../interfaces/IPromiseCore.sol";
+import "../interfaces/IERC20.sol";
 
 contract PromTest {
     uint112 nonce;
@@ -32,14 +32,14 @@ contract PromTest {
         createPromise();
         uint256 joinerAmount;
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
-        joinPromise(currentId, alice, joinerAmount / 2);
-        joinPromise(currentId, bob, joinerAmount / 2);
+        joinPromise(currentId, alice, uint112(joinerAmount) / 2);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 2);
         payPromise(currentId, address(this));
         payPromise(currentId, alice);
         payPromise(currentId, bob);
     }
 
-    // executes promises for creatore, alice, bob
+    // executes promises for creator, alice, bob
     function scenario1Execution() public {
         executePromise(currentId, address(this));
         executePromise(currentId, alice);
@@ -54,8 +54,8 @@ contract PromTest {
         createPromise();
         uint256 joinerAmount;
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
-        joinPromise(currentId, alice, joinerAmount / 3);
-        joinPromise(currentId, bob, joinerAmount / 5);
+        joinPromise(currentId, alice, uint112(joinerAmount) / 3);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 5);
         payPromise(currentId, address(this));
         payPromise(currentId, alice);
         payPromise(currentId, bob);
@@ -64,6 +64,46 @@ contract PromTest {
     // executes promises for creatore, alice, bob
     function scenario2Execution() public {
         executePromise(currentId, address(this));
+        executePromise(currentId, alice);
+        executePromise(currentId, bob);
+    }
+
+    /* creating a promise with contract as creator
+    joining promise with alice and bob fragmented amounts each leaving an active amount left
+    paying promise for creator, alice and bob */
+    function scenario3() public {
+        approve();
+        createPromise();
+        uint256 joinerAmount;
+        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        joinPromise(currentId, alice, uint112(joinerAmount) / 10);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 7);
+        payPromise(currentId, address(this));
+        payPromise(currentId, bob);
+    }
+
+    // executes promises for creatore, alice, bob
+    function scenario3Execution() public {
+        executePromise(currentId, address(this));
+        executePromise(currentId, bob);
+    }
+
+    /* creating a promise with contract as creator
+    joining promise with alice and bob fragmented amounts each leaving an active amount left
+    paying promise for creator, alice and bob */
+    function scenario4() public {
+        approve();
+        createPromise();
+        uint256 joinerAmount;
+        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        joinPromise(currentId, alice, uint112(joinerAmount) / 10);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 7);
+        payPromise(currentId, alice);
+        payPromise(currentId, bob);
+    }
+
+    // executes promises for creatore, alice, bob
+    function scenario4Execution() public {
         executePromise(currentId, alice);
         executePromise(currentId, bob);
     }
@@ -79,7 +119,7 @@ contract PromTest {
             amountIn,
             token2,
             amountOut,
-            block.timestamp + 1 minutes
+            block.timestamp + 11 minutes
         );
         uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
         require(balanceBefore - balanceAfter == amountIn / 2, "wrong amount taken during creation");
@@ -94,12 +134,12 @@ contract PromTest {
         address account,
         uint112 _amount
     ) public {
-        uint256 balanceBefore = IERC20(token2).balanceOf(account);
+        uint256 balanceBefore = IERC20(token2).balanceOf(address(this));
         IPromiseCore(promiseCore).joinPromise(id, account, _amount);
-        uint256 balanceAfter = IERC20(token2).balanceOf(account);
+        uint256 balanceAfter = IERC20(token2).balanceOf(address(this));
         require(balanceBefore - balanceAfter == _amount / 2, "wrong amount taken during joining");
         uint256 debt;
-        (, debt) = getReceivingAndOutstandingDebt(_id, account);
+        (, debt) = getReceivingAndOutstandingDebt(id, account);
         require(debt == _amount / 2, "wrong amount of debt");
         checkAccountPromisesIsCorrect(id, account, _amount / 2);
     }
@@ -110,17 +150,17 @@ contract PromTest {
         uint256 debt;
         (, debt) = getReceivingAndOutstandingDebt(_id, account);
         if (account == address(this)) {
-            balanceBefore = IERC20(token1).balanceOf(account);
+            balanceBefore = IERC20(token1).balanceOf(address(this));
             IPromiseCore(promiseCore).payPromise(_id, account);
-            balanceAfter = IERC20(token1).balanceOf(account);
+            balanceAfter = IERC20(token1).balanceOf(address(this));
             require(debt == balanceBefore - balanceAfter, "incorrect amount paid to the promise by creator");
         } else {
-            balanceBefore = IERC20(token2).balanceOf(account);
+            balanceBefore = IERC20(token2).balanceOf(address(this));
             IPromiseCore(promiseCore).payPromise(_id, account);
-            balanceAfter = IERC20(token2).balanceOf(account);
+            balanceAfter = IERC20(token2).balanceOf(address(this));
             require(debt == balanceBefore - balanceAfter, "incorrect amount paid to the promise by joiner");
         }
-        checkAccountPromisesIsCorrect(_id, account, (balanceAfter - balanceBefore));
+        checkAccountPromisesIsCorrect(_id, account, 0);
     }
 
     function executePromise(uint256 _id, address account) public {
@@ -133,7 +173,7 @@ contract PromTest {
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token2).balanceOf(account);
             require(
-                receiving == (((balanceAfter - balanceBefore) * 2) / 100),
+                (receiving - (((receiving) * 2) / 100)) == (balanceAfter - balanceBefore),
                 "incorrect amount paid to the creator at execution"
             );
         } else {
@@ -141,7 +181,7 @@ contract PromTest {
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(account);
             require(
-                receiving == (((balanceAfter - balanceBefore) * 2) / 100),
+                (receiving - (((receiving) * 2) / 100)) == (balanceAfter - balanceBefore),
                 "incorrect amount paid to the joiner at execution"
             );
         }
@@ -156,7 +196,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, , receiving, outstandingDebt, ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
         uint256 i;
         while (_id != id[i]) {
             i++;
@@ -169,27 +209,26 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, , receiving, outstandingDebt, ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
         uint256 i;
-        while (_id != id[i] || i > 9) {
+        while (i < id.length) {
+            require(_id != id[i], "Promise wasn't removed from account promises");
             i++;
-            if (_id == id[i]) {
-                require(1 == 0, "Promise wasn't removed from account promises");
-            }
         }
     }
 
-    function getReceivingAndOutstandingDebt(uint256 _id, address account) public view returns (uint256, uint256) {
+    function getReceivingAndOutstandingDebt(uint256 _id, address account) public view returns (uint256 a, uint256 b) {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, , receiving, outstandingDebt, ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
         uint256 i;
         while (_id != id[i]) {
             i++;
             require(i < 10, "Promise not in account promises");
         }
-        return (receiving[i], outstandingDebt[i]);
+        a = receiving[i];
+        b = outstandingDebt[i];
     }
 
     function checkJoinablePromisesIsCorrect(
@@ -198,7 +237,7 @@ contract PromTest {
         address _token2,
         uint112 _creatorAmount,
         uint112 _joinerAmount
-    ) public view {
+    ) public {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
@@ -208,25 +247,26 @@ contract PromTest {
             i++;
             require(i < 10, "ID not found in account promises");
         }
-        require(creatorAmount[i] == _creatorAmount, "amount in on joinable promises is incorrect");
-        require(joinerAmount[i] == _joinerAmount, "amount out on joinable promises is incorrect");
+        // Assert.equal(creatorAmount[i], _creatorAmount, "amount in on joinable promises is incorrect");
+        // Assert.equal(joinerAmount[i] , _joinerAmount, "amount out on joinable promises is incorrect");
     }
 
     function getJoinablePromisesIsCorrect(
         uint256 _id,
         address _token1,
         address _token2
-    ) public view returns (uint256, uint256) {
+    ) public view returns (uint256 a, uint256 b) {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2);
+        (id, creatorAmount, joinerAmount, ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2);
         uint256 i;
         while (_id != id[i]) {
             i++;
             require(i < 10, "ID not found in account promises");
         }
-        return (creatorAmount[i], joinerAmount[i]);
+        a = creatorAmount[i];
+        b = joinerAmount[i];
     }
 
     function getRandomNumber() public returns (uint112) {
