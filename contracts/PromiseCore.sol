@@ -343,7 +343,9 @@ contract PromiseCore is ReentrancyGuard {
 
     function joinablePromises(
         address _creatorToken,
-        address _joinerToken /* ,
+        address _joinerToken,
+        uint256 _earliestExpirationDate,
+        uint256 _lastestExpirationDate /*
         uint256 toCreatorTokenJoinerTokenRatio,
         uint256 fromCreatorTokenJoinerTokenRatio */
     )
@@ -370,12 +372,15 @@ contract PromiseCore is ReentrancyGuard {
         while (i < _length) {
             id[i] = list[index].id;
             p = promises[id[i]];
-            creatorAmount[i] = uint256(p.creatorAmount).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-            );
-            joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-            expirationTimestamp[i] = p.expirationTimestamp;
-            index = list[index].next;
+            if (p.expirationTimestamp >= _earliestExpirationDate || p.expirationTimestamp <= _lastestExpirationDate) {
+                creatorAmount[i] = uint256(p.creatorAmount).sub(
+                    shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+                );
+                joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+                expirationTimestamp[i] = p.expirationTimestamp;
+                index = list[index].next;
+            }
+
             i += 1;
         }
     }
