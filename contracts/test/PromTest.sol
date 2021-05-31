@@ -70,7 +70,7 @@ contract PromTest {
 
     /* creating a promise with contract as creator
     joining promise with alice and bob fragmented amounts each leaving an active amount left
-    paying promise for creator, alice and bob */
+    paying promise for creator and bob */
     function scenario3() public {
         approve();
         createPromise();
@@ -90,7 +90,7 @@ contract PromTest {
 
     /* creating a promise with contract as creator
     joining promise with alice and bob fragmented amounts each leaving an active amount left
-    paying promise for creator, alice and bob */
+    paying promise for alice and bob */
     function scenario4() public {
         approve();
         createPromise();
@@ -102,7 +102,7 @@ contract PromTest {
         payPromise(currentId, bob);
     }
 
-    // executes promises for creatore, alice, bob
+    // executes promises for alice and bob
     function scenario4Execution() public {
         executePromise(currentId, alice);
         executePromise(currentId, bob);
@@ -247,8 +247,8 @@ contract PromTest {
             i++;
             require(i < 10, "ID not found in account promises");
         }
-        // Assert.equal(creatorAmount[i], _creatorAmount, "amount in on joinable promises is incorrect");
-        // Assert.equal(joinerAmount[i] , _joinerAmount, "amount out on joinable promises is incorrect");
+        // assert.equal(creatorAmount[i], _creatorAmount, "amount in on joinable promises is incorrect");
+        // assert.equal(joinerAmount[i] , _joinerAmount, "amount out on joinable promises is incorrect");
     }
 
     function getJoinablePromisesIsCorrect(

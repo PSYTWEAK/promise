@@ -10,19 +10,16 @@ contract PromTeamSplitter {
   using SafeERC20 for IERC20;
 
   uint256[] public pay_table;
-  uint8 public constant payee_count = 7;
+  uint8 public constant payee_count = 4;
   uint16 public constant scale = 100;
 
   constructor () {
 
     pay_table = [
-      pack(address(), 55),  // 55%
-      pack(address(), 20),  // 20%
-      pack(address(), 5),  // 5%
-      pack(address(), 5),  // 5%
-      pack(address(), 5),  // 5%
-      pack(address(), 5),  // 5%
-      pack(address(), 5),  // 25%
+      pack(address(), 10),  // 10%
+      pack(address(), 10),  // 10%
+      pack(address(), 10),  // 10%
+      pack(address(), 70),  // 70%
     ];
 
     uint sum;

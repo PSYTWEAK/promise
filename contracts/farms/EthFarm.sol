@@ -1,16 +1,20 @@
 // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.8.0;
 
-
-import { IERC20 } from "../interfaces/IERC20.sol";
-import { Math } from  "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
-import { SafeMath } from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
-import { SafeERC20 } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
-import { ReentrancyGuard } from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
-
+import {IERC20} from "../interfaces/IERC20.sol";
+import {Math} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/Math.sol";
+import {
+    SafeMath
+} from "https://github.com/OpenZeppelin/openzeppelin-contracts/blob/master/contracts/utils/math/SafeMath.sol";
+import {
+    SafeERC20
+} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/token/ERC20/utils/SafeERC20.sol";
+import {
+    ReentrancyGuard
+} from "https://github.com/OpenZeppelin/openzeppelin-contracts/contracts/security/ReentrancyGuard.sol";
 
 // Inheritance
-import { RewardsDistributionRecipient } from  "../lib/RewardsDistributionRecipient.sol";
+import {RewardsDistributionRecipient} from "../lib/RewardsDistributionRecipient.sol";
 import {IWETH} from "../interfaces/IWETH.sol";
 import {IPromController} from "../interfaces/IPromController.sol";
 
@@ -33,12 +37,12 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     address public prom;
 
     PromiseOptions[3] public promiseOptions;
-    
+
     struct PromiseOptions {
         uint256 ratio;
         uint256 time;
     }
-    
+
     mapping(address => uint256) public userRewardPerTokenPaid;
     mapping(address => uint256) public rewards;
     mapping(uint256 => bool) public logged;
@@ -56,7 +60,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     ) public {
         rewardsToken = IERC20(_rewardsToken);
         stakingToken = IERC20(_stakingToken);
-        WETH = _stakingToken
+        WETH = _stakingToken;
         DAI = _dai;
         prom = _prom;
         rewardsDistribution = msg.sender;
@@ -85,11 +89,17 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         if (_totalSupply == 0) {
             return rewardPerTokenStored;
         }
-        return rewardPerTokenStored.add(lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply));
+        return
+            rewardPerTokenStored.add(
+                lastTimeRewardApplicable().sub(lastUpdateTime).mul(rewardRate).mul(1e18).div(_totalSupply)
+            );
     }
 
     function earned(address account) public view returns (uint256) {
-        return _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(rewards[account]);
+        return
+            _balances[account].mul(rewardPerToken().sub(userRewardPerTokenPaid[account])).div(1e18).add(
+                rewards[account]
+            );
     }
 
     function getRewardForDuration() external view returns (uint256) {
@@ -101,23 +111,31 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     function createPromise(uint256 optionIndex) external payable nonReentrant updateReward(msg.sender) {
         uint256 amountB = (msg.value.mul(promiseOptions[optionIndex].ratio));
         stakingToken.deposit{value: msg.value}();
-        IPromController(prom).createPromise(msg.sender, (msg.value).mul(2), address(stakingToken), amountB, DAI, promiseOptions[optionIndex].time);
+        IPromController(prom).createPromise(
+            msg.sender,
+            (msg.value).mul(2),
+            address(stakingToken),
+            amountB,
+            DAI,
+            promiseOptions[optionIndex].time
+        );
         emit PromiseCreatedInFarm(msg.sender, amountB);
     }
-    
-    function logPromiseAfterJoined(uint id) external nonReentrant updateReward(msg.sender) {
+
+    function logPromiseAfterJoined(uint256 id) external nonReentrant updateReward(msg.sender) {
         require(logged[id] == false);
         logged[id] = true;
-            uint amountA;
-           address assetA;
-    uint amountB;
-    address assetB;
-    uint time;
-    bool executed;
-    address addrA;
-    address addrB;
-    (amountA,assetA,amountB,assetB,time,executed) = IPromController(prom).getPromiseData_Amount_Asset_Time_Executed(id);
-    (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
+        uint256 amountA;
+        address assetA;
+        uint256 amountB;
+        address assetB;
+        uint256 time;
+        bool executed;
+        address addrA;
+        address addrB;
+        (amountA, assetA, amountB, assetB, time, executed) = IPromController(prom)
+            .getPromiseData_Amount_Asset_Time_Executed(id);
+        (addrA, addrB) = IPromController(prom).getPromiseData_Addr(id);
 
         // commented while testing
         // require(executed == true);
@@ -126,7 +144,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         _balances[msg.sender] = _balances[msg.sender].add(amountA);
     }
 
-    function getReward(uint id) public nonReentrant updateReward(msg.sender) {
+    function getReward(uint256 id) public nonReentrant updateReward(msg.sender) {
         uint256 reward = rewards[msg.sender];
         if (reward > 0) {
             rewards[msg.sender] = 0;
@@ -135,16 +153,15 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         }
     }
 
-
     function setRatios(uint256[3] memory _ratios, uint256[3] memory _times) external onlyRewardsDistribution {
-        for (uint256 i; i < 3;i++) {
+        for (uint256 i; i < 3; i++) {
             promiseOptions[i].ratio = _ratios[i];
             promiseOptions[i].time = _times[i];
         }
     }
 
     /* ========== RESTRICTED FUNCTIONS ========== */
-    
+
     function approveProm() external onlyRewardsDistribution {
         stakingToken.approve(prom, 2**256 - 1);
     }
