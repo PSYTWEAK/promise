@@ -1,4 +1,4 @@
-pragma solidity >=0.4.21 <0.8.0;
+/* pragma solidity >=0.4.21 <0.8.0;
 
 // Inheritance
 import "./Ownable.sol";
@@ -18,3 +18,4 @@ contract RewardsDistributionRecipient is Ownable {
         rewardsDistribution = _rewardsDistribution;
     }
 }
+ */

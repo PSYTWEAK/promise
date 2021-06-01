@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+/* // SPDX-License-Identifier: MIT
 pragma solidity >=0.4.21 <0.8.0;
 
 import {IERC20} from "../interfaces/IERC20.sol";
@@ -22,7 +22,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    /* ========== STATE VARIABLES ========== */
+
 
     IERC20 public rewardsToken;
     IWETH public stakingToken;
@@ -50,7 +50,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
     uint256 private _totalSupply;
     mapping(address => uint256) private _balances;
 
-    /* ========== CONSTRUCTOR ========== */
+
 
     constructor(
         address _rewardsToken,
@@ -71,7 +71,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         }
     }
 
-    /* ========== VIEWS ========== */
+
 
     function totalSupply() external view returns (uint256) {
         return _totalSupply;
@@ -106,7 +106,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         return rewardRate.mul(rewardsDuration);
     }
 
-    /* ========== MUTATIVE FUNCTIONS ========== */
+
 
     function createPromise(uint256 optionIndex) external payable nonReentrant updateReward(msg.sender) {
         uint256 amountB = (msg.value.mul(promiseOptions[optionIndex].ratio));
@@ -160,7 +160,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         }
     }
 
-    /* ========== RESTRICTED FUNCTIONS ========== */
+
 
     function approveProm() external onlyRewardsDistribution {
         stakingToken.approve(prom, 2**256 - 1);
@@ -187,7 +187,7 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         emit RewardAdded(reward);
     }
 
-    /* ========== MODIFIERS ========== */
+
 
     modifier updateReward(address account) {
         rewardPerTokenStored = rewardPerToken();
@@ -199,9 +199,10 @@ contract EthFarm is RewardsDistributionRecipient, ReentrancyGuard {
         _;
     }
 
-    /* ========== EVENTS ========== */
+
 
     event RewardAdded(uint256 reward);
     event PromiseCreatedInFarm(address indexed user, uint256 amount);
     event RewardPaid(address indexed user, uint256 reward);
 }
+ */

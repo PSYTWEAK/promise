@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+/* // SPDX-License-Identifier: MIT
 
 pragma solidity ^0.7.1;
 
@@ -76,4 +76,4 @@ contract PromTeamSplitter {
   function unpack(uint256 value) public pure returns (address, uint16) {
     return (address(value), uint16(value >> 160));
   }
-}
+} */

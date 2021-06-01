@@ -13,6 +13,7 @@ contract PromTest {
     address bob = address(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2);
     uint256 currentId;
     uint256[] promiseIds;
+    uint256 creatorOutstandingDebt;
 
     constructor(
         address _promiseCore,
@@ -99,7 +100,6 @@ contract PromTest {
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 10);
         joinPromise(currentId, bob, uint112(joinerAmount) / 7);
-        joinPromise(currentId, bob, uint112(joinerAmount) / 9);
         payPromise(currentId, alice);
         payPromise(currentId, bob);
     }
@@ -155,6 +155,7 @@ contract PromTest {
         currentId++;
         promiseIds.push(currentId);
         checkAccountPromisesIsCorrect(currentId, address(this), amountIn / 2);
+        creatorOutstandingDebt = amountIn / 2;
         checkJoinablePromisesIsCorrect(currentId, token1, token2, amountIn, amountOut);
     }
 
@@ -167,9 +168,9 @@ contract PromTest {
         IPromiseCore(promiseCore).joinPromise(id, account, _amount);
         uint256 balanceAfter = IERC20(token2).balanceOf(address(this));
         require(balanceBefore - balanceAfter == _amount / 2, "wrong amount taken during joining");
-        uint256 debt;
-        (, debt) = getReceivingAndOutstandingDebt(id, account);
-        require(debt == _amount / 2, "wrong amount of debt");
+        uint256 debtAfter;
+        (, debtAfter) = getReceivingAndOutstandingDebt(id, account);
+        require(debtAfter == _amount / 2, "wrong amount of debt");
         checkAccountPromisesIsCorrect(id, account, _amount / 2);
     }
 
@@ -183,6 +184,7 @@ contract PromTest {
             IPromiseCore(promiseCore).payPromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(address(this));
             require(debt == balanceBefore - balanceAfter, "incorrect amount paid to the promise by creator");
+            creatorOutstandingDebt = 0;
         } else {
             balanceBefore = IERC20(token2).balanceOf(address(this));
             IPromiseCore(promiseCore).payPromise(_id, account);
@@ -197,22 +199,32 @@ contract PromTest {
         uint256 balanceAfter;
         uint256 receiving;
         (receiving, ) = getReceivingAndOutstandingDebt(_id, account);
-        if (account == address(this)) {
-            balanceBefore = IERC20(token2).balanceOf(account);
-            IPromiseCore(promiseCore).executePromise(_id, account);
-            balanceAfter = IERC20(token2).balanceOf(account);
-            require(
-                (receiving - (((receiving) * 2) / 100)) == (balanceAfter - balanceBefore),
-                "incorrect amount paid to the creator at execution"
-            );
-        } else {
+        if (creatorOutstandingDebt > 0) {
             balanceBefore = IERC20(token1).balanceOf(account);
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(account);
             require(
-                (receiving - (((receiving) * 2) / 100)) == (balanceAfter - balanceBefore),
+                ((receiving / 2) - (((receiving / 2) * 3) / 1000)) == (balanceAfter - balanceBefore),
                 "incorrect amount paid to the joiner at execution"
             );
+        } else {
+            if (account == address(this)) {
+                balanceBefore = IERC20(token2).balanceOf(account);
+                IPromiseCore(promiseCore).executePromise(_id, account);
+                balanceAfter = IERC20(token2).balanceOf(account);
+                require(
+                    (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
+                    "incorrect amount paid to the creator at execution"
+                );
+            } else {
+                balanceBefore = IERC20(token1).balanceOf(account);
+                IPromiseCore(promiseCore).executePromise(_id, account);
+                balanceAfter = IERC20(token1).balanceOf(account);
+                require(
+                    (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
+                    "incorrect amount paid to the joiner at execution"
+                );
+            }
         }
         checkRemovedFromAccountPromises(_id, account);
     }

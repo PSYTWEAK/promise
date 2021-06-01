@@ -22,17 +22,24 @@ contract WETHGateway {
 
     function createPromiseWithETH(
         address account,
-        uint256 amountB,
-        address assetB,
-        uint256 time
+        uint112 joinerAmount,
+        address joinerToken,
+        uint256 expirationDate
     ) external payable {
         IWETH(WETH).deposit{value: msg.value}();
-        IPromiseCore(prom).createPromise(account, (msg.value).mul(2), WETH, amountB, assetB, time);
+        IPromiseCore(prom).createPromise(
+            account,
+            WETH,
+            uint112((msg.value).mul(2)),
+            joinerToken,
+            joinerAmount,
+            expirationDate
+        );
     }
 
     function joinPromiseWithETH(uint256 id, address account) external payable {
         IWETH(WETH).deposit{value: msg.value}();
-        IPromiseCore(prom).joinPromise(id, account);
+        IPromiseCore(prom).joinPromise(id, account, uint112((msg.value).mul(2)));
     }
 
     function payPromiseWithETH(uint256 id, address account) external payable {

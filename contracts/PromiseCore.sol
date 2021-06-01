@@ -164,17 +164,13 @@ contract PromiseCore is ReentrancyGuard {
             joiners[id][joinerId].hasExecuted = true;
             Promjoiners memory j = joiners[id][joinerId];
             amountA = shareCal(
-                uint112(uint256(p.creatorAmount).sub(p.creatorDebt)),
+                uint112(uint256(p.creatorAmount).sub(uint256(p.creatorDebt))),
                 p.joinerAmount,
                 (j.amountPaid).sub(j.outstandingDebt)
             );
             amountB = 0;
             if (p.creatorDebt > 0) {
-                amountB = shareCal(
-                    uint112((j.amountPaid).sub(j.outstandingDebt)),
-                    uint112(p.joinerPaidFull),
-                    p.creatorDebt
-                );
+                amountB = uint112((j.amountPaid).sub(j.outstandingDebt.mul(2)));
             }
             payOut(amountA, amountB, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
@@ -343,9 +339,8 @@ contract PromiseCore is ReentrancyGuard {
 
     function joinablePromises(
         address _creatorToken,
-        address _joinerToken,
-        uint256 _earliestExpirationDate,
-        uint256 _lastestExpirationDate /*
+        address _joinerToken /* uint256 _earliestExpirationDate,
+        uint256 _lastestExpirationDate 
         uint256 toCreatorTokenJoinerTokenRatio,
         uint256 fromCreatorTokenJoinerTokenRatio */
     )
@@ -372,14 +367,12 @@ contract PromiseCore is ReentrancyGuard {
         while (i < _length) {
             id[i] = list[index].id;
             p = promises[id[i]];
-            if (p.expirationTimestamp >= _earliestExpirationDate || p.expirationTimestamp <= _lastestExpirationDate) {
-                creatorAmount[i] = uint256(p.creatorAmount).sub(
-                    shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-                );
-                joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-                expirationTimestamp[i] = p.expirationTimestamp;
-                index = list[index].next;
-            }
+            creatorAmount[i] = uint256(p.creatorAmount).sub(
+                shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+            );
+            joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+            expirationTimestamp[i] = p.expirationTimestamp;
+            index = list[index].next;
 
             i += 1;
         }
