@@ -22,36 +22,61 @@ contract("PromCore", async (accounts) => {
       from: accounts[0],
     });
   });
-  it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay and all 3 execute", async () => {
+  it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay", async () => {
     await promTester.scenario1();
+  });
+  it("All participants execute with correct amounts paid out", async () => {
     await promTester.scenario1Execution();
+  });
+  it("No tokens left over from scenario one", async () => {
     await promTester.hasLeftOver();
   });
-  it("Scenario Two - Creator makes promise, alice and bob join fractions each, all 3 pay and 3 execute", async () => {
+  it("Scenario Two - Creator makes promise, alice and bob join fractions each, all 3 pay", async () => {
     await promTester.scenario2();
+  });
+  it("All participants execute with correct amounts paid out", async () => {
     await promTester.scenario2Execution();
+  });
+  it("No tokens left over from scenario one", async () => {
     await promTester.hasLeftOver();
   });
-  it("Scenario Three - Creator makes promise, alice and bob join fractions each, 2 pay alice doesn't and 2 execute", async () => {
+
+  it("Scenario Three - Creator makes promise, alice and bob join fractions each, 2 pay alice doesn't", async () => {
     await promTester.scenario3();
+  });
+  it("All participants except alice execute with correct amounts paid out", async () => {
     await promTester.scenario3Execution();
+  });
+  it("No tokens left over from scenario one", async () => {
     await promTester.hasLeftOver();
   });
   it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
     await promTester.scenario4();
+  });
+  it("Creator closes pending amount and is paid out correctly", async () => {
     await promTester.scenario5ClosePendingAmount();
+  });
+  it("All participants except alice execute with correct amounts paid out", async () => {
     await promTester.scenario4Execution();
+  });
+  it("No tokens left over from scenario one", async () => {
     await promTester.hasLeftOver();
   });
   it("Scenario Five - Creator makes promise, lots of users join, some pay and some execute", async () => {
     await promTester.scenario5();
-    for (var i = 1; i < 2; i++) {
+    for (var i = 1; i < 6; i++) {
       await promTester.scenario5JoiningAndPaying(accounts[i]);
     }
+  });
+  it("Creator closes pending amount and is paid out correctly", async () => {
     await promTester.scenario5ClosePendingAmount();
-    for (var i = 1; i < 2; i++) {
+  });
+  it("All participants execute with correct amounts paid out", async () => {
+    for (var i = 1; i < 6; i++) {
       await promTester.scenario5Execution(accounts[i]);
     }
+  });
+  it("No tokens left over from scenario one", async () => {
     await promTester.hasLeftOver();
   });
 });
