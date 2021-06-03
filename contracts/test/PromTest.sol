@@ -105,7 +105,7 @@ contract PromTest {
         uint256 joinerAmount;
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 10);
-        joinPromise(currentId, bob, uint112(joinerAmount) / 7);
+        joinPromise(currentId, bob, uint112(joinerAmount) / 10);
         payPromise(currentId, alice);
         payPromise(currentId, bob);
     }
@@ -114,6 +114,7 @@ contract PromTest {
     function scenario4Execution() public {
         executePromise(currentId, alice);
         executePromise(currentId, bob);
+        executePromise(currentId, address(this));
     }
 
     function scenario5() public {
@@ -203,36 +204,26 @@ contract PromTest {
         uint256 balanceAfter;
         uint256 receiving;
         (receiving, ) = getReceivingAndOutstandingDebt(_id, account);
-        if (creatorOutstandingDebt > 0) {
+        if (account == address(this)) {
+            balanceBefore = IERC20(token2).balanceOf(account);
+            IPromiseCore(promiseCore).executePromise(_id, account);
+            balanceAfter = IERC20(token2).balanceOf(account);
+            emit paid(((receiving) - (((receiving) * 3) / 1000)), (balanceAfter - balanceBefore));
+            require(
+                (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
+                "incorrect amount paid to the creator at execution"
+            );
+        } else {
             balanceBefore = IERC20(token1).balanceOf(account);
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(account);
-            emit paid(((receiving / 2) - (((receiving / 2) * 3) / 1000)), (balanceAfter - balanceBefore));
-            /*             require(
-                ((receiving / 2) - (((receiving / 2) * 3) / 1000)) == (balanceAfter - balanceBefore),
-                "incorrect amount paid to the joiner at execution with creator in debt"
-            ); */
-        } else {
-            if (account == address(this)) {
-                balanceBefore = IERC20(token2).balanceOf(account);
-                IPromiseCore(promiseCore).executePromise(_id, account);
-                balanceAfter = IERC20(token2).balanceOf(account);
-                emit paid(((receiving / 2) - (((receiving / 2) * 3) / 1000)), (balanceAfter - balanceBefore));
-                require(
-                    (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
-                    "incorrect amount paid to the creator at execution"
-                );
-            } else {
-                balanceBefore = IERC20(token1).balanceOf(account);
-                IPromiseCore(promiseCore).executePromise(_id, account);
-                balanceAfter = IERC20(token1).balanceOf(account);
-                emit paid(((receiving / 2) - (((receiving / 2) * 3) / 1000)), (balanceAfter - balanceBefore));
-                require(
-                    (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
-                    "incorrect amount paid to the joiner at execution"
-                );
-            }
+            emit paid(((receiving) - (((receiving) * 3) / 1000)), (balanceAfter - balanceBefore));
+            require(
+                (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
+                "incorrect amount paid to the joiner at execution"
+            );
         }
+
         checkRemovedFromAccountPromises(_id, account);
     }
 

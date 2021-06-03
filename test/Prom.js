@@ -64,7 +64,7 @@ contract("PromCore", async (accounts) => {
   });
   it("Scenario Five - Creator makes promise, lots of users join, some pay and some execute", async () => {
     await promTester.scenario5();
-    for (var i = 1; i < 6; i++) {
+    for (var i = 1; i < 8; i++) {
       await promTester.scenario5JoiningAndPaying(accounts[i]);
     }
   });
@@ -72,7 +72,8 @@ contract("PromCore", async (accounts) => {
     await promTester.scenario5ClosePendingAmount();
   });
   it("All participants execute with correct amounts paid out", async () => {
-    for (var i = 1; i < 6; i++) {
+    await promTester.scenario5ForCreator();
+    for (var i = 1; i < 8; i++) {
       await promTester.scenario5Execution(accounts[i]);
     }
   });

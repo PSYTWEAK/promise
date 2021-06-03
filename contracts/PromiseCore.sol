@@ -130,17 +130,20 @@ contract PromiseCore is ReentrancyGuard {
        */
         uint256 totalJoinerCapital = (p.joinerPaidFull).add(p.joinerDebt.mul(2));
         uint256 refund =
-            uint256(uint256(p.creatorAmount).sub(p.creatorDebt)).sub(
+            shareCal(uint112(uint256(p.creatorAmount).sub(p.creatorDebt)), p.joinerAmount, p.creatorAmount).sub(
                 shareCal(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
             );
-        promises[id].creatorAmount -= uint112(refund);
+        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
         promises[id].joinerAmount = uint112(totalJoinerCapital);
+        promises[id].creatorDebt = 0;
         deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         if (joinersLength[id] == 0) {
             deleteFromAccountList(id, msg.sender);
             promises[id].hasCreatorExecuted = true;
         }
+        require(refund > 0, "nothing to refund");
         IERC20(p.creatorToken).transfer(p.creator, refund);
+        promises[id].creatorDebt = 0;
         emit PromiseCanceled(msg.sender, id);
     }
 
