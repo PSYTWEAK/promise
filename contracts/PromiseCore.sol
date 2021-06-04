@@ -140,7 +140,7 @@ contract PromiseCore is ReentrancyGuard {
         promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund.div(2).mul(2)));
         promises[id].joinerAmount = uint112(totalJoinerCapital);
         promises[id].creatorDebt = 0;
-        deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
+        deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
         if (joinersLength[id] == 0) {
             deleteFromAccountList(id, msg.sender);
             promises[id].hasCreatorExecuted = true;
@@ -166,7 +166,7 @@ contract PromiseCore is ReentrancyGuard {
             joinerAmount = uint256(p.joinerDebt).add(p.joinerPaidFull);
             payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
+            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
         } else {
             bytes32 joinerId = sha256(abi.encodePacked(id, account));
             require(joiners[id][joinerId].hasExecuted == false, "Already executed");
@@ -184,7 +184,7 @@ contract PromiseCore is ReentrancyGuard {
             }
             payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
+            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
         }
 
         emit PromiseExecuted(account, id);
@@ -258,7 +258,7 @@ contract PromiseCore is ReentrancyGuard {
         p = promises[id];
         leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         if (leftOverjoinerAmount == 0) {
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
+            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
         }
 
         emit PromiseJoined(account, id, amount);
@@ -330,9 +330,11 @@ contract PromiseCore is ReentrancyGuard {
     function deleteFromJoinableList(
         uint256 id,
         address creatorToken,
-        address joinerToken
+        address joinerToken,
+        uint256 expirationTimestamp
     ) internal {
-        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken));
+        uint256 expirationMonthSinceStartBlockTime = (startBlockTime.sub(expirationTimestamp)).div(30 days);
+        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
         bytes32 index = sha256(abi.encodePacked(listId, id));
         deleteEntry(id, listId, index);
     }
@@ -342,8 +344,8 @@ contract PromiseCore is ReentrancyGuard {
         address joinerToken,
         uint256 expirationTimestamp
     ) internal {
-        uint256 expirationMonth = (startBlockTime.sub(expirationTimestamp)).div(30 days);
-        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonth));
+        uint256 expirationMonthSinceStartBlockTime = (startBlockTime.sub(expirationTimestamp)).div(30 days);
+        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
     }
