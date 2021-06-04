@@ -124,8 +124,8 @@ contract PromTest {
     function scenario5JoiningAndPaying(address account) public {
         uint256 joinerAmount;
         (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
-        joinPromise(currentId, account, uint112(joinerAmount) / 10);
-        emit joinedWith(joinerAmount, joinerAmount / 3);
+        joinPromise(currentId, account, uint112(joinerAmount) / 100);
+        emit joinedWith(joinerAmount, uint112(joinerAmount) / 100);
 
         payPromise(currentId, account);
     }

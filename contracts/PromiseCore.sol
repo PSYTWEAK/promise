@@ -133,6 +133,7 @@ contract PromiseCore is ReentrancyGuard {
             shareCal(uint112(uint256(p.creatorAmount).sub(p.creatorDebt)), p.joinerAmount, p.creatorAmount).sub(
                 shareCal(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
             );
+
         promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
         promises[id].joinerAmount = uint112(totalJoinerCapital);
         promises[id].creatorDebt = 0;
