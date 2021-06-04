@@ -11,6 +11,8 @@ contract PromiseCore is ReentrancyGuard {
     using ShareCalculator for uint224;
 
     address public feeAddress;
+    uint256 public fee = 3;
+    uint256 public startBlockTime;
 
     mapping(uint256 => PromData) public promises;
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
@@ -63,6 +65,7 @@ contract PromiseCore is ReentrancyGuard {
 
     constructor(address _feeAddress) public {
         feeAddress = _feeAddress;
+        startBlockTime = block.timestamp;
     }
 
     function createPromise(
@@ -114,7 +117,7 @@ contract PromiseCore is ReentrancyGuard {
             );
             promises[id].joinerDebt -= joiners[id][joinerId].outstandingDebt;
             promises[id].joinerPaidFull += joiners[id][joinerId].outstandingDebt.mul(2);
-            joiners[id][joinerId].amountPaid = joiners[id][joinerId].outstandingDebt.mul(2);
+            joiners[id][joinerId].amountPaid += joiners[id][joinerId].outstandingDebt;
             joiners[id][joinerId].outstandingDebt = 0;
             emit PromisePaid(account, id, joiners[id][joinerId].outstandingDebt);
         }
@@ -130,11 +133,11 @@ contract PromiseCore is ReentrancyGuard {
        */
         uint256 totalJoinerCapital = (p.joinerPaidFull).add(p.joinerDebt.mul(2));
         uint256 refund =
-            shareCal(uint112(uint256(p.creatorAmount).sub(p.creatorDebt)), p.joinerAmount, p.creatorAmount).sub(
+            (uint256(p.creatorAmount).sub(p.creatorDebt)).sub(
                 shareCal(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
             );
 
-        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
+        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund.div(2).mul(2)));
         promises[id].joinerAmount = uint112(totalJoinerCapital);
         promises[id].creatorDebt = 0;
         deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
@@ -150,18 +153,18 @@ contract PromiseCore is ReentrancyGuard {
 
     function executePromise(uint256 id, address account) external nonReentrant {
         // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
-        uint256 amountA;
-        uint256 amountB;
+        uint256 creatorAmount;
+        uint256 joinerAmount;
         PromData memory p = promises[id];
         if (account == promises[id].creator) {
             require(promises[id].hasCreatorExecuted == false, "Already executed");
             require(promises[id].creatorDebt == 0, "Creator didn't go through with the promise");
             promises[id].hasCreatorExecuted = true;
-            amountA = uint256(p.creatorAmount).sub(p.creatorDebt.mul(2)).sub(
+            creatorAmount = uint256(p.creatorAmount).sub(p.creatorDebt.mul(2)).sub(
                 shareCal(p.creatorAmount, p.joinerAmount, p.joinerPaidFull)
             );
-            amountB = uint256(p.joinerDebt).add(p.joinerPaidFull);
-            payOut(amountA, amountB, account, p.creatorToken, p.joinerToken);
+            joinerAmount = uint256(p.joinerDebt).add(p.joinerPaidFull);
+            payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
             deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         } else {
@@ -170,16 +173,16 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][joinerId].outstandingDebt == 0, "Joiner didn't go through with the promise");
             joiners[id][joinerId].hasExecuted = true;
             Promjoiners memory j = joiners[id][joinerId];
-            amountA = shareCal(
+            creatorAmount = shareCal(
                 uint112(uint256(p.creatorAmount).sub(uint256(p.creatorDebt))),
                 p.joinerAmount,
                 (j.amountPaid).sub(j.outstandingDebt)
             );
-            amountB = 0;
+            joinerAmount = 0;
             if (p.creatorDebt > 0) {
-                amountB = uint112((j.amountPaid).sub(j.outstandingDebt.mul(2)));
+                joinerAmount = uint112((j.amountPaid).sub(j.outstandingDebt.mul(2)));
             }
-            payOut(amountA, amountB, account, p.creatorToken, p.joinerToken);
+            payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
             deleteFromJoinableList(id, p.creatorToken, p.joinerToken);
         }
@@ -209,11 +212,9 @@ contract PromiseCore is ReentrancyGuard {
             0,
             expirationTimestamp
         );
-        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken));
+        addToJoinableList(creatorToken, joinerToken, expirationTimestamp);
+        bytes32 listId = sha256(abi.encodePacked(account));
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
-        addEntry(lastId, listId, entry);
-        listId = sha256(abi.encodePacked(account));
-        entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
 
         emit PromiseCreated(account, creatorToken, creatorAmount, joinerToken, joinerAmount, expirationTimestamp);
@@ -270,8 +271,8 @@ contract PromiseCore is ReentrancyGuard {
         address assetA,
         address assetB
     ) internal {
-        uint256 feeA = shareCal(uint112(amountA), 1000, 3);
-        uint256 feeB = shareCal(uint112(amountB), 1000, 3);
+        uint256 feeA = shareCal(uint112(amountA), 1000, fee);
+        uint256 feeB = shareCal(uint112(amountB), 1000, fee);
         IERC20(assetA).transfer(account, amountA.sub(feeA));
         IERC20(assetB).transfer(account, amountB.sub(feeB));
         IERC20(assetA).transfer(feeAddress, feeA);
@@ -336,6 +337,17 @@ contract PromiseCore is ReentrancyGuard {
         deleteEntry(id, listId, index);
     }
 
+    function addToJoinableList(
+        address creatorToken,
+        address joinerToken,
+        uint256 expirationTimestamp
+    ) internal {
+        uint256 expirationMonth = (startBlockTime.sub(expirationTimestamp)).div(30 days);
+        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonth));
+        bytes32 entry = sha256(abi.encodePacked(listId, lastId));
+        addEntry(lastId, listId, entry);
+    }
+
     function shareCal(
         uint112 a,
         uint112 b,
@@ -346,8 +358,9 @@ contract PromiseCore is ReentrancyGuard {
 
     function joinablePromises(
         address _creatorToken,
-        address _joinerToken /* uint256 _earliestExpirationDate,
-        uint256 _lastestExpirationDate 
+        address _joinerToken,
+        uint256 _earliestExpirationDate,
+        uint256 _latestExpirationDate /* 
         uint256 toCreatorTokenJoinerTokenRatio,
         uint256 fromCreatorTokenJoinerTokenRatio */
     )
