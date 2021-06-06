@@ -9,10 +9,9 @@ import {ShareCalculator} from "./lib/math/ShareCalculator.sol";
 contract PromiseCore is ReentrancyGuard {
     using SafeMath for uint256;
     using ShareCalculator for uint224;
-
+    uint256 public startBlockTime;
     address public feeAddress;
     uint256 public fee = 3;
-    uint256 public startBlockTime;
 
     mapping(uint256 => PromData) public promises;
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
@@ -333,7 +332,7 @@ contract PromiseCore is ReentrancyGuard {
         address joinerToken,
         uint256 expirationTimestamp
     ) internal {
-        uint256 expirationMonthSinceStartBlockTime = (startBlockTime.sub(expirationTimestamp)).div(30 days);
+        uint256 expirationMonthSinceStartBlockTime = numberOfMonthsSinceDeployed(expirationTimestamp);
         bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
         bytes32 index = sha256(abi.encodePacked(listId, id));
         deleteEntry(id, listId, index);
@@ -344,7 +343,7 @@ contract PromiseCore is ReentrancyGuard {
         address joinerToken,
         uint256 expirationTimestamp
     ) internal {
-        uint256 expirationMonthSinceStartBlockTime = (startBlockTime.sub(expirationTimestamp)).div(30 days);
+        uint256 expirationMonthSinceStartBlockTime = numberOfMonthsSinceDeployed(expirationTimestamp);
         bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
@@ -354,19 +353,22 @@ contract PromiseCore is ReentrancyGuard {
         uint112 a,
         uint112 b,
         uint256 c
-    ) public view returns (uint256 z) {
-        z = ShareCalculator.divMul(a, b, uint224(c));
+    ) public view returns (uint256 result) {
+        result = ShareCalculator.divMul(a, b, uint224(c));
+    }
+
+    function numberOfMonthsSinceDeployed(uint256 expirationTimestamp) internal view returns (uint256 result) {
+        result = (expirationTimestamp.sub(startBlockTime)).div(30 days);
     }
 
     function joinablePromises(
         address _creatorToken,
         address _joinerToken,
-        uint256 _earliestExpirationDate,
-        uint256 _latestExpirationDate /* 
+        uint256 _dateWithinPreferedMonth /* 
         uint256 toCreatorTokenJoinerTokenRatio,
         uint256 fromCreatorTokenJoinerTokenRatio */
     )
-        external
+        public
         view
         returns (
             uint256[] memory id,
@@ -375,7 +377,10 @@ contract PromiseCore is ReentrancyGuard {
             uint256[] memory expirationTimestamp
         )
     {
-        bytes32 listId = sha256(abi.encodePacked(_creatorToken, _joinerToken));
+        bytes32 listId =
+            sha256(
+                abi.encodePacked(_creatorToken, _joinerToken, numberOfMonthsSinceDeployed(_dateWithinPreferedMonth))
+            );
         uint256 _length = length[listId];
 
         id = new uint256[](_length);
@@ -401,7 +406,7 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function accountPromises(address account)
-        external
+        public
         view
         returns (
             uint256[] memory id,
