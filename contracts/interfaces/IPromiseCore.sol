@@ -37,7 +37,11 @@ interface IPromiseCore {
 
     function closePendingPromiseAmount(uint256 id) external;
 
-    function joinablePromises(address _creatorToken, address _joinerToken)
+    function joinablePromises(
+        address _creatorToken,
+        address _joinerToken,
+        uint256 _dateWithinPreferedMonth
+    )
         external
         view
         returns (

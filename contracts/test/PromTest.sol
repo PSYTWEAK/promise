@@ -13,6 +13,7 @@ contract PromTest {
     address alice = address(0x0A098Eda01Ce92ff4A4CCb7A4fFFb5A43EBC70DC);
     address bob = address(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2);
     uint256 currentId;
+    uint256 currentExpiry;
     uint256[] promiseIds;
     uint256 creatorOutstandingDebt;
 
@@ -158,6 +159,7 @@ contract PromTest {
         uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
         require(balanceBefore - balanceAfter == amountIn / 2, "wrong amount taken during creation");
         currentId++;
+        currentExpiry = block.timestamp + 11 minutes;
         promiseIds.push(currentId);
         checkAccountPromisesIsCorrect(currentId, address(this), amountIn / 2);
         creatorOutstandingDebt = amountIn / 2;
@@ -222,6 +224,7 @@ contract PromTest {
         }
 
         checkRemovedFromAccountPromises(_id, account);
+        checkRemovedFromJoinablePromises(_id);
     }
 
     function checkAccountPromisesIsCorrect(
@@ -254,6 +257,16 @@ contract PromTest {
         }
     }
 
+    function checkRemovedFromJoinablePromises(uint256 _id) public view {
+        uint256[] memory id;
+        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(token1, token2, currentExpiry);
+        uint256 i;
+        while (i < id.length) {
+            require(_id != id[i], "Promise wasn't removed from joinable promises");
+            i++;
+        }
+    }
+
     function getReceivingAndOutstandingDebt(uint256 _id, address account) public view returns (uint256 a, uint256 b) {
         uint256[] memory id;
         uint256[] memory receiving;
@@ -278,7 +291,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2);
+        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2, currentExpiry);
         uint256 i;
         while (_id != id[i]) {
             i++;
@@ -298,7 +311,11 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, creatorAmount, joinerAmount, ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2);
+        (id, creatorAmount, joinerAmount, ) = IPromiseCore(promiseCore).joinablePromises(
+            _token1,
+            _token2,
+            currentExpiry
+        );
         uint256 i;
         while (_id != id[i]) {
             i++;
