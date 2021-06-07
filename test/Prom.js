@@ -25,7 +25,7 @@ contract("PromCore", async (accounts) => {
   it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay", async () => {
     await promTester.scenario1();
   });
-  it("All participants execute with correct amounts paid out", async () => {
+     it("All participants execute with correct amounts paid out", async () => {
     await promTester.scenario1Execution();
   });
   it("Scenario Two - Creator makes promise, alice and bob join fractions each, all 3 pay", async () => {
@@ -79,5 +79,5 @@ contract("PromCore", async (accounts) => {
         await promTester.hasLeftOver();
       }
     });
-  }
+  } */
 });

@@ -434,7 +434,7 @@ contract PromiseCore is ReentrancyGuard {
             id[i] = list[index].id;
             p = promises[id[i]];
             tokens[i > 0 ? i * 2 : 0] = p.creatorToken;
-            tokens[i > 0 ? (i * 2) - 1 : 1] = p.joinerToken;
+            tokens[i > 0 ? (i * 2) + 1 : 1] = p.joinerToken;
             if (p.creator == account) {
                 outstandingDebt[i] = p.creatorDebt;
                 receiving[i] = uint256(p.joinerDebt).add(p.joinerPaidFull);

@@ -38,8 +38,10 @@ contract PromTest {
     function scenario1() public {
         approve();
         createPromise();
+        createPromise();
+        createPromise();
         uint256 joinerAmount;
-        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount));
         payPromise(currentId, address(this));
         payPromise(currentId, alice);
@@ -58,7 +60,7 @@ contract PromTest {
         approve();
         createPromise();
         uint256 joinerAmount;
-        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 3);
         joinPromise(currentId, bob, uint112(joinerAmount) / 5);
         payPromise(currentId, address(this));
@@ -80,7 +82,7 @@ contract PromTest {
         approve();
         createPromise();
         uint256 joinerAmount;
-        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 10);
         joinPromise(currentId, bob, uint112(joinerAmount) / 7);
         payPromise(currentId, address(this));
@@ -101,7 +103,7 @@ contract PromTest {
         approve();
         createPromise();
         uint256 joinerAmount;
-        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
         joinPromise(currentId, alice, uint112(joinerAmount) / 10);
         joinPromise(currentId, bob, uint112(joinerAmount) / 10);
         payPromise(currentId, alice);
@@ -121,7 +123,7 @@ contract PromTest {
 
     function scenario5JoiningAndPaying(address account) public {
         uint256 joinerAmount;
-        (, joinerAmount) = getJoinablePromisesIsCorrect(currentId, token1, token2);
+        (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
         joinPromise(currentId, account, uint112(joinerAmount) / 100);
         emit joinedWith(joinerAmount, uint112(joinerAmount) / 100);
 
@@ -303,7 +305,7 @@ contract PromTest {
          */
     }
 
-    function getJoinablePromisesIsCorrect(
+    function getJoinablePromisesAmounts(
         uint256 _id,
         address _token1,
         address _token2
