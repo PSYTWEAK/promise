@@ -16,23 +16,23 @@ library ShareCalculator {
     }
 
     // encode a uint112 as a UQ112x112
-    function encode(uint112 y) public view returns (uint224 z) {
+    function encode(uint112 y) public pure returns (uint224 z) {
         z = uint224(y) * Q112; // never overflows
     }
 
     // divide a UQ112x112 by a uint112, returning a UQ112x112
-    function div(uint224 x, uint112 y) public view returns (uint224 z) {
+    function div(uint224 x, uint112 y) public pure returns (uint224 z) {
         z = x / uint224(y);
     }
 
-    function mul(uint224 x, uint224 y) public view returns (uint224 z) {
+    function mul(uint224 x, uint224 y) public pure returns (uint224 z) {
         z = x * y;
         if (x == 0) {
             z = 0;
         }
     }
 
-    function decode(uint224 x) public view returns (uint256 z) {
+    function decode(uint224 x) public pure returns (uint256 z) {
         z = (x >> 112);
     }
 }

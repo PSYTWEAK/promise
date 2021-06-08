@@ -58,7 +58,7 @@ contract PromiseCore is ReentrancyGuard {
     );
 
     event PromiseJoined(address addrB, uint256 id, uint256 amount);
-    event PromiseCanceled(address executor, uint256 id);
+    event PromisePendingAmountClosed(address executor, uint256 id, uint256 refund);
     event PromiseExecuted(address executor, uint256 id);
     event PromisePaid(address Payee, uint256 id, uint256 remainingDebt);
 
@@ -133,7 +133,7 @@ contract PromiseCore is ReentrancyGuard {
         uint256 totalJoinerCapital = (p.joinerPaidFull).add(p.joinerDebt.mul(2));
         uint256 refund =
             (uint256(p.creatorAmount).sub(p.creatorDebt)).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
+                divMul(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
             );
 
         promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
@@ -151,10 +151,10 @@ contract PromiseCore is ReentrancyGuard {
             deleteFromAccountList(id, msg.sender);
             promises[id].hasCreatorExecuted = true;
         }
-        require(refund > 0, "nothing to refund");
+        require(refund > 0, "Nothing to refund");
         IERC20(p.creatorToken).transfer(p.creator, refund);
         promises[id].creatorDebt = 0;
-        emit PromiseCanceled(msg.sender, id);
+        emit PromisePendingAmountClosed(msg.sender, id, refund);
     }
 
     function executePromise(uint256 id, address account) external nonReentrant {
@@ -167,7 +167,7 @@ contract PromiseCore is ReentrancyGuard {
             require(promises[id].creatorDebt == 0, "Creator didn't go through with the promise");
             promises[id].hasCreatorExecuted = true;
             creatorAmount = uint256(p.creatorAmount).sub(p.creatorDebt.mul(2)).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, p.joinerPaidFull)
+                divMul(p.creatorAmount, p.joinerAmount, p.joinerPaidFull)
             );
             joinerAmount = uint256(p.joinerDebt).add(p.joinerPaidFull);
             payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
@@ -186,7 +186,7 @@ contract PromiseCore is ReentrancyGuard {
             require(joiners[id][joinerId].outstandingDebt == 0, "Joiner didn't go through with the promise");
             joiners[id][joinerId].hasExecuted = true;
             Promjoiners memory j = joiners[id][joinerId];
-            creatorAmount = shareCal(
+            creatorAmount = divMul(
                 uint112(uint256(p.creatorAmount).sub(uint256(p.creatorDebt))),
                 p.joinerAmount,
                 (j.amountPaid).sub(j.outstandingDebt)
@@ -250,11 +250,6 @@ contract PromiseCore is ReentrancyGuard {
         uint256 leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         //require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
         require(_amount <= leftOverjoinerAmount, "Amount too high for this promise");
-        /*        
-       Adding entries to two linked lists:
-       firstly adding this account and info (amountPaid, outstandingDebt, executed) to the list of joiner info for this promise
-       secondly adding this promise to a list of promises the account is involved with 
-       */
         bytes32 listId = sha256(abi.encodePacked(id));
         bytes32 entry = sha256(abi.encodePacked(listId, account));
         addEntry(joinersLength[id], listId, entry);
@@ -265,18 +260,15 @@ contract PromiseCore is ReentrancyGuard {
         }
         uint256 amount = uint256(_amount).div(2);
         require(amount > 0, "Amount too small");
-        /*        
-         amount is not added to joinerPaidFull on join as this payment is irrelevant until outstandingDebt is paid in full
-       */
         promises[id].joinerDebt += amount;
         joiners[id][joinerId].outstandingDebt += amount;
         joiners[id][joinerId].amountPaid += amount;
         joinersLength[id]++;
+        p = promises[id];
+        leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         /*        
          if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
        */
-        p = promises[id];
-        leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         if (leftOverjoinerAmount == 0) {
             deleteFromJoinableList(
                 id,
@@ -397,7 +389,7 @@ contract PromiseCore is ReentrancyGuard {
         addEntry(lastId, listId, entry);
     }
 
-    function shareCal(
+    function divMul(
         uint112 a,
         uint112 b,
         uint256 c
@@ -457,7 +449,7 @@ contract PromiseCore is ReentrancyGuard {
             id[i] = list[index].id;
             p = promises[id[i]];
             creatorAmount[i] = uint256(p.creatorAmount).sub(
-                shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+                divMul(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
             );
             joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
             expirationTimestamp[i] = p.expirationTimestamp;
@@ -504,7 +496,7 @@ contract PromiseCore is ReentrancyGuard {
                 bytes32 joinerId = sha256(abi.encodePacked(id[i], account));
                 j = joiners[id[i]][joinerId];
                 outstandingDebt[i] = j.outstandingDebt;
-                receiving[i] = shareCal(p.creatorAmount, p.joinerAmount, (j.amountPaid).add(j.outstandingDebt));
+                receiving[i] = divMul(p.creatorAmount, p.joinerAmount, (j.amountPaid).add(j.outstandingDebt));
             }
             expirationTimestamp[i] = p.expirationTimestamp;
             index = list[index].next;
@@ -523,7 +515,7 @@ contract PromiseCore is ReentrancyGuard {
     {
         PromData memory p = promises[_id];
         creatorAmount = uint256(p.creatorAmount).sub(
-            shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+            divMul(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
         );
         joinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         expirationTimestamp = p.expirationTimestamp;
