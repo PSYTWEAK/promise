@@ -40,7 +40,9 @@ interface IPromiseCore {
     function joinablePromises(
         address _creatorToken,
         address _joinerToken,
-        uint256 _dateWithinPreferedMonth
+        uint256 preferedDateWithinMonth,
+        uint112 preferedCreatorAmount,
+        uint112 preferedJoinerAmount
     )
         external
         view

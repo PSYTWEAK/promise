@@ -22,10 +22,12 @@ contract("PromCore", async (accounts) => {
       from: accounts[0],
     });
   });
+  let i = 0;
+
   it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay", async () => {
     await promTester.scenario1();
   });
-     it("All participants execute with correct amounts paid out", async () => {
+  it("All participants execute with correct amounts paid out", async () => {
     await promTester.scenario1Execution();
   });
   it("Scenario Two - Creator makes promise, alice and bob join fractions each, all 3 pay", async () => {
@@ -40,15 +42,18 @@ contract("PromCore", async (accounts) => {
   it("All participants except alice execute with correct amounts paid out", async () => {
     await promTester.scenario3Execution();
   });
-  it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
-    await promTester.scenario4();
-  });
-  it("Creator closes pending amount and is paid out correctly", async () => {
-    await promTester.scenario5ClosePendingAmount();
-  });
-  it("All participants except alice execute with correct amounts paid out", async () => {
-    await promTester.scenario4Execution();
-  });
+  while (i < 100) {
+    it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
+      await promTester.scenario4();
+    });
+    it("Creator closes pending amount and is paid out correctly", async () => {
+      await promTester.scenario5ClosePendingAmount();
+    });
+    it("All participants execute with correct amounts paid out", async () => {
+      await promTester.scenario4Execution();
+    });
+    i++;
+  }
   it("Scenario Five - Creator makes promise, lots of users join, some pay and some execute", async () => {
     await promTester.scenario5();
     for (var i = 1; i < 8; i++) {
@@ -59,25 +64,22 @@ contract("PromCore", async (accounts) => {
     await promTester.scenario5ClosePendingAmount();
   });
   it("All participants execute with correct amounts paid out", async () => {
-    await promTester.scenario5ForCreator();
+    // await promTester.scenario5ForCreator();
     for (var i = 1; i < 8; i++) {
       await promTester.scenario5Execution(accounts[i]);
     }
   });
-  let i = 0;
-  while (i < 10) {
-    i++;
-    it(`Promise spam number ${i}, creating and joining`, async () => {
-      await promTester.scenario5();
-      for (var i = 1; i < 8; i++) {
-        await promTester.scenario5JoiningAndPaying(accounts[i]);
-      }
-      await promTester.scenario5ClosePendingAmount();
-      await promTester.scenario5ForCreator();
-      for (var i = 1; i < 8; i++) {
-        await promTester.scenario5Execution(accounts[i]);
-        await promTester.hasLeftOver();
-      }
-    });
-  } */
+
+  it(`Promise spam number ${i}, creating, joining and executing`, async () => {
+    await promTester.scenario5();
+    for (var i = 1; i < 8; i++) {
+      await promTester.scenario5JoiningAndPaying(accounts[i]);
+    }
+    await promTester.scenario5ClosePendingAmount();
+    await promTester.scenario5ForCreator();
+    for (var i = 1; i < 8; i++) {
+      await promTester.scenario5Execution(accounts[i]);
+      await promTester.hasLeftOver();
+    }
+  });
 });

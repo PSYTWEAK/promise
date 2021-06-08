@@ -14,6 +14,8 @@ contract PromTest {
     address bob = address(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2);
     uint256 currentId;
     uint256 currentExpiry;
+    uint112 currentCreatorAmount;
+    uint112 currentJoinerAmount;
     uint256[] promiseIds;
     uint256 creatorOutstandingDebt;
 
@@ -37,8 +39,6 @@ contract PromTest {
        paying promise for creator & alice */
     function scenario1() public {
         approve();
-        createPromise();
-        createPromise();
         createPromise();
         uint256 joinerAmount;
         (, joinerAmount) = getJoinablePromisesAmounts(currentId, token1, token2);
@@ -162,6 +162,8 @@ contract PromTest {
         require(balanceBefore - balanceAfter == amountIn / 2, "wrong amount taken during creation");
         currentId++;
         currentExpiry = block.timestamp + 11 minutes;
+        currentCreatorAmount = amountIn;
+        currentJoinerAmount = amountOut;
         promiseIds.push(currentId);
         checkAccountPromisesIsCorrect(currentId, address(this), amountIn / 2);
         creatorOutstandingDebt = amountIn / 2;
@@ -209,20 +211,18 @@ contract PromTest {
             balanceBefore = IERC20(token2).balanceOf(account);
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token2).balanceOf(account);
-            emit paid(((receiving) - (((receiving) * 3) / 1000)), (balanceAfter - balanceBefore));
-            require(
-                (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
-                "incorrect amount paid to the creator at execution"
-            );
+            bool greaterThan = (receiving - (((receiving) * 5) / 1000)) > (balanceAfter - balanceBefore);
+            bool lessThan = (receiving - (((receiving) * 5) / 1000)) < (balanceAfter - balanceBefore);
+            require(greaterThan == false, "lower amount paid to the creator at execution");
+            require(lessThan == false, "higher amount paid to the creator at execution");
         } else {
             balanceBefore = IERC20(token1).balanceOf(account);
             IPromiseCore(promiseCore).executePromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(account);
-            emit paid(((receiving) - (((receiving) * 3) / 1000)), (balanceAfter - balanceBefore));
-            require(
-                (receiving - (((receiving) * 3) / 1000)) == (balanceAfter - balanceBefore),
-                "incorrect amount paid to the joiner at execution"
-            );
+            bool greaterThan = (receiving - (((receiving) * 5) / 1000)) > (balanceAfter - balanceBefore);
+            bool lessThan = (receiving - (((receiving) * 5) / 1000)) < (balanceAfter - balanceBefore);
+            require(greaterThan == false, "lower amount paid to the creator at execution");
+            require(lessThan == false, "higher amount paid to the creator at execution");
         }
 
         checkRemovedFromAccountPromises(_id, account);
@@ -241,7 +241,7 @@ contract PromTest {
         uint256 i;
         while (_id != id[i]) {
             i++;
-            require(i < 10, "ID not found in account promises");
+            require(i < 40, "ID not found in account promises");
         }
         emit debt(outstandingDebt[i], _outstandingDebt);
         require(outstandingDebt[i] == _outstandingDebt, "outstanding debt on account promises is incorrect");
@@ -261,7 +261,13 @@ contract PromTest {
 
     function checkRemovedFromJoinablePromises(uint256 _id) public view {
         uint256[] memory id;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(token1, token2, currentExpiry);
+        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(
+            token1,
+            token2,
+            currentExpiry,
+            currentCreatorAmount,
+            currentJoinerAmount
+        );
         uint256 i;
         while (i < id.length) {
             require(_id != id[i], "Promise wasn't removed from joinable promises");
@@ -277,7 +283,7 @@ contract PromTest {
         uint256 i;
         while (_id != id[i]) {
             i++;
-            require(i < 10, "Promise not in account promises");
+            require(i < 40, "Promise not in account promises");
         }
         a = receiving[i];
         b = outstandingDebt[i];
@@ -293,11 +299,17 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(_token1, _token2, currentExpiry);
+        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(
+            _token1,
+            _token2,
+            currentExpiry,
+            currentCreatorAmount,
+            currentJoinerAmount
+        );
         uint256 i;
         while (_id != id[i]) {
             i++;
-            require(i < 10, "ID not found in account promises");
+            require(i < 40, "ID not found in account promises");
         }
         /* 
             require(creatorAmount[i] == _creatorAmount, "amount in on joinable promises is incorrect");
@@ -316,12 +328,14 @@ contract PromTest {
         (id, creatorAmount, joinerAmount, ) = IPromiseCore(promiseCore).joinablePromises(
             _token1,
             _token2,
-            currentExpiry
+            currentExpiry,
+            currentCreatorAmount,
+            currentJoinerAmount
         );
         uint256 i;
         while (_id != id[i]) {
             i++;
-            require(i < 10, "ID not found in account promises");
+            require(i < 40, "ID not found in account promises");
         }
         a = creatorAmount[i];
         b = joinerAmount[i];

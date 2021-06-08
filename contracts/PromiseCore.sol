@@ -11,7 +11,7 @@ contract PromiseCore is ReentrancyGuard {
     using ShareCalculator for uint224;
     uint256 public startBlockTime;
     address public feeAddress;
-    uint256 public fee = 3;
+    uint256 public fee = 5;
 
     mapping(uint256 => PromData) public promises;
     mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
@@ -136,10 +136,17 @@ contract PromiseCore is ReentrancyGuard {
                 shareCal(p.creatorAmount, p.joinerAmount, totalJoinerCapital)
             );
 
-        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund.div(2).mul(2)));
+        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
         promises[id].joinerAmount = uint112(totalJoinerCapital);
         promises[id].creatorDebt = 0;
-        deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
+        deleteFromJoinableList(
+            id,
+            p.creatorToken,
+            p.joinerToken,
+            p.expirationTimestamp,
+            p.creatorAmount,
+            p.joinerAmount
+        );
         if (joinersLength[id] == 0) {
             deleteFromAccountList(id, msg.sender);
             promises[id].hasCreatorExecuted = true;
@@ -165,7 +172,14 @@ contract PromiseCore is ReentrancyGuard {
             joinerAmount = uint256(p.joinerDebt).add(p.joinerPaidFull);
             payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
+            deleteFromJoinableList(
+                id,
+                p.creatorToken,
+                p.joinerToken,
+                p.expirationTimestamp,
+                p.creatorAmount,
+                p.joinerAmount
+            );
         } else {
             bytes32 joinerId = sha256(abi.encodePacked(id, account));
             require(joiners[id][joinerId].hasExecuted == false, "Already executed");
@@ -183,7 +197,14 @@ contract PromiseCore is ReentrancyGuard {
             }
             payOut(creatorAmount, joinerAmount, account, p.creatorToken, p.joinerToken);
             deleteFromAccountList(id, account);
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
+            deleteFromJoinableList(
+                id,
+                p.creatorToken,
+                p.joinerToken,
+                p.expirationTimestamp,
+                p.creatorAmount,
+                p.joinerAmount
+            );
         }
 
         emit PromiseExecuted(account, id);
@@ -211,7 +232,7 @@ contract PromiseCore is ReentrancyGuard {
             0,
             expirationTimestamp
         );
-        addToJoinableList(creatorToken, joinerToken, expirationTimestamp);
+        addToJoinableList(creatorToken, joinerToken, expirationTimestamp, creatorAmount, joinerAmount);
         bytes32 listId = sha256(abi.encodePacked(account));
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
@@ -257,7 +278,14 @@ contract PromiseCore is ReentrancyGuard {
         p = promises[id];
         leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         if (leftOverjoinerAmount == 0) {
-            deleteFromJoinableList(id, p.creatorToken, p.joinerToken, p.expirationTimestamp);
+            deleteFromJoinableList(
+                id,
+                p.creatorToken,
+                p.joinerToken,
+                p.expirationTimestamp,
+                p.creatorAmount,
+                p.joinerAmount
+            );
         }
 
         emit PromiseJoined(account, id, amount);
@@ -270,8 +298,8 @@ contract PromiseCore is ReentrancyGuard {
         address assetA,
         address assetB
     ) internal {
-        uint256 feeA = shareCal(uint112(amountA), 1000, fee);
-        uint256 feeB = shareCal(uint112(amountB), 1000, fee);
+        uint256 feeA = amountA.mul(fee).div(1000);
+        uint256 feeB = amountB.mul(fee).div(1000);
         IERC20(assetA).transfer(account, amountA.sub(feeA));
         IERC20(assetB).transfer(account, amountB.sub(feeB));
         IERC20(assetA).transfer(feeAddress, feeA);
@@ -330,10 +358,20 @@ contract PromiseCore is ReentrancyGuard {
         uint256 id,
         address creatorToken,
         address joinerToken,
-        uint256 expirationTimestamp
+        uint256 expirationTimestamp,
+        uint112 creatorAmount,
+        uint112 joinerAmount
     ) internal {
-        uint256 expirationMonthSinceStartBlockTime = numberOfMonthsSinceDeployed(expirationTimestamp);
-        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
+        bytes32 listId =
+            sha256(
+                abi.encodePacked(
+                    creatorToken,
+                    joinerToken,
+                    numberOfMonthsSinceDeployed(expirationTimestamp),
+                    numberOfBytesInUint(creatorAmount),
+                    numberOfBytesInUint(joinerAmount)
+                )
+            );
         bytes32 index = sha256(abi.encodePacked(listId, id));
         deleteEntry(id, listId, index);
     }
@@ -341,10 +379,20 @@ contract PromiseCore is ReentrancyGuard {
     function addToJoinableList(
         address creatorToken,
         address joinerToken,
-        uint256 expirationTimestamp
+        uint256 expirationTimestamp,
+        uint112 creatorAmount,
+        uint112 joinerAmount
     ) internal {
-        uint256 expirationMonthSinceStartBlockTime = numberOfMonthsSinceDeployed(expirationTimestamp);
-        bytes32 listId = sha256(abi.encodePacked(creatorToken, joinerToken, expirationMonthSinceStartBlockTime));
+        bytes32 listId =
+            sha256(
+                abi.encodePacked(
+                    creatorToken,
+                    joinerToken,
+                    numberOfMonthsSinceDeployed(expirationTimestamp),
+                    numberOfBytesInUint(creatorAmount),
+                    numberOfBytesInUint(joinerAmount)
+                )
+            );
         bytes32 entry = sha256(abi.encodePacked(listId, lastId));
         addEntry(lastId, listId, entry);
     }
@@ -361,12 +409,20 @@ contract PromiseCore is ReentrancyGuard {
         result = (expirationTimestamp.sub(startBlockTime)).div(30 days);
     }
 
+    function numberOfBytesInUint(uint112 number) public pure returns (uint256 _length) {
+        _length = 0;
+        while (number != 0) {
+            number >>= 8;
+            _length++;
+        }
+    }
+
     function joinablePromises(
         address _creatorToken,
         address _joinerToken,
-        uint256 _dateWithinPreferedMonth /* 
-        uint256 toCreatorTokenJoinerTokenRatio,
-        uint256 fromCreatorTokenJoinerTokenRatio */
+        uint256 preferedDateWithinMonth,
+        uint112 preferedCreatorAmount,
+        uint112 preferedJoinerAmount
     )
         public
         view
@@ -379,7 +435,13 @@ contract PromiseCore is ReentrancyGuard {
     {
         bytes32 listId =
             sha256(
-                abi.encodePacked(_creatorToken, _joinerToken, numberOfMonthsSinceDeployed(_dateWithinPreferedMonth))
+                abi.encodePacked(
+                    _creatorToken,
+                    _joinerToken,
+                    numberOfMonthsSinceDeployed(preferedDateWithinMonth),
+                    numberOfBytesInUint(preferedCreatorAmount),
+                    numberOfBytesInUint(preferedJoinerAmount)
+                )
             );
         uint256 _length = length[listId];
 
@@ -401,7 +463,7 @@ contract PromiseCore is ReentrancyGuard {
             expirationTimestamp[i] = p.expirationTimestamp;
             index = list[index].next;
 
-            i += 1;
+            i++;
         }
     }
 
@@ -446,7 +508,24 @@ contract PromiseCore is ReentrancyGuard {
             }
             expirationTimestamp[i] = p.expirationTimestamp;
             index = list[index].next;
-            i += 1;
+            i++;
         }
+    }
+
+    function getPromise(uint256 _id)
+        public
+        view
+        returns (
+            uint256 creatorAmount,
+            uint256 joinerAmount,
+            uint256 expirationTimestamp
+        )
+    {
+        PromData memory p = promises[_id];
+        creatorAmount = uint256(p.creatorAmount).sub(
+            shareCal(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
+        );
+        joinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+        expirationTimestamp = p.expirationTimestamp;
     }
 }
