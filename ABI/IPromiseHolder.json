@@ -1,0 +1,360 @@
+{
+  "contractName": "IPromiseHolder",
+  "abi": [
+    {
+      "inputs": [
+        {
+          "internalType": "address",
+          "name": "token",
+          "type": "address"
+        }
+      ],
+      "name": "approvePromiseChef",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    },
+    {
+      "inputs": [
+        {
+          "internalType": "uint256",
+          "name": "id",
+          "type": "uint256"
+        }
+      ],
+      "name": "closePendingPromiseAmount",
+      "outputs": [],
+      "stateMutability": "nonpayable",
+      "type": "function"
+    }
+  ],
+  "metadata": "{\"compiler\":{\"version\":\"0.7.6+commit.7338295f\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"address\",\"name\":\"token\",\"type\":\"address\"}],\"name\":\"approvePromiseChef\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint256\",\"name\":\"id\",\"type\":\"uint256\"}],\"name\":\"closePendingPromiseAmount\",\"outputs\":[],\"stateMutability\":\"nonpayable\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol\":\"IPromiseHolder\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol\":{\"keccak256\":\"0xa4ed0ef767e83095b5d3726f7390fdd3cac5e09b8ececc64215d05d6996d5462\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://e7419a1120171e0346d770aa74d43601e9973c8a5a59fea9c8fc50e7abe6a469\",\"dweb:/ipfs/QmRwQJRTYtFumcPzRJajH3cpybwVkmf9Y8J629QxQgZsLA\"]}},\"version\":1}",
+  "bytecode": "0x",
+  "deployedBytecode": "0x",
+  "immutableReferences": {},
+  "sourceMap": "",
+  "deployedSourceMap": "",
+  "source": "// SPDX-License-Identifier: MIT\n\npragma solidity >=0.4.21 <0.8.0;\n\ninterface IPromiseHolder {\n    function approvePromiseChef(address token) external;\n\n    function closePendingPromiseAmount(uint256 id) external;\n}\n",
+  "sourcePath": "/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol",
+  "ast": {
+    "absolutePath": "/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol",
+    "exportedSymbols": {
+      "IPromiseHolder": [
+        5055
+      ]
+    },
+    "id": 5056,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 5044,
+        "literals": [
+          "solidity",
+          ">=",
+          "0.4",
+          ".21",
+          "<",
+          "0.8",
+          ".0"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "33:32:12"
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 5055,
+        "linearizedBaseContracts": [
+          5055
+        ],
+        "name": "IPromiseHolder",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "functionSelector": "0f5f4df3",
+            "id": 5049,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "approvePromiseChef",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 5047,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 5046,
+                  "mutability": "mutable",
+                  "name": "token",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 5049,
+                  "src": "126:13:12",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 5045,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "126:7:12",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "125:15:12"
+            },
+            "returnParameters": {
+              "id": 5048,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "149:0:12"
+            },
+            "scope": 5055,
+            "src": "98:52:12",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "45ac5e02",
+            "id": 5054,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "closePendingPromiseAmount",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 5052,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 5051,
+                  "mutability": "mutable",
+                  "name": "id",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 5054,
+                  "src": "191:10:12",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 5050,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "191:7:12",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "190:12:12"
+            },
+            "returnParameters": {
+              "id": 5053,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "211:0:12"
+            },
+            "scope": 5055,
+            "src": "156:56:12",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 5056,
+        "src": "67:147:12"
+      }
+    ],
+    "src": "33:182:12"
+  },
+  "legacyAST": {
+    "absolutePath": "/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol",
+    "exportedSymbols": {
+      "IPromiseHolder": [
+        5055
+      ]
+    },
+    "id": 5056,
+    "license": "MIT",
+    "nodeType": "SourceUnit",
+    "nodes": [
+      {
+        "id": 5044,
+        "literals": [
+          "solidity",
+          ">=",
+          "0.4",
+          ".21",
+          "<",
+          "0.8",
+          ".0"
+        ],
+        "nodeType": "PragmaDirective",
+        "src": "33:32:12"
+      },
+      {
+        "abstract": false,
+        "baseContracts": [],
+        "contractDependencies": [],
+        "contractKind": "interface",
+        "fullyImplemented": false,
+        "id": 5055,
+        "linearizedBaseContracts": [
+          5055
+        ],
+        "name": "IPromiseHolder",
+        "nodeType": "ContractDefinition",
+        "nodes": [
+          {
+            "functionSelector": "0f5f4df3",
+            "id": 5049,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "approvePromiseChef",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 5047,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 5046,
+                  "mutability": "mutable",
+                  "name": "token",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 5049,
+                  "src": "126:13:12",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_address",
+                    "typeString": "address"
+                  },
+                  "typeName": {
+                    "id": 5045,
+                    "name": "address",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "126:7:12",
+                    "stateMutability": "nonpayable",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_address",
+                      "typeString": "address"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "125:15:12"
+            },
+            "returnParameters": {
+              "id": 5048,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "149:0:12"
+            },
+            "scope": 5055,
+            "src": "98:52:12",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          },
+          {
+            "functionSelector": "45ac5e02",
+            "id": 5054,
+            "implemented": false,
+            "kind": "function",
+            "modifiers": [],
+            "name": "closePendingPromiseAmount",
+            "nodeType": "FunctionDefinition",
+            "parameters": {
+              "id": 5052,
+              "nodeType": "ParameterList",
+              "parameters": [
+                {
+                  "constant": false,
+                  "id": 5051,
+                  "mutability": "mutable",
+                  "name": "id",
+                  "nodeType": "VariableDeclaration",
+                  "scope": 5054,
+                  "src": "191:10:12",
+                  "stateVariable": false,
+                  "storageLocation": "default",
+                  "typeDescriptions": {
+                    "typeIdentifier": "t_uint256",
+                    "typeString": "uint256"
+                  },
+                  "typeName": {
+                    "id": 5050,
+                    "name": "uint256",
+                    "nodeType": "ElementaryTypeName",
+                    "src": "191:7:12",
+                    "typeDescriptions": {
+                      "typeIdentifier": "t_uint256",
+                      "typeString": "uint256"
+                    }
+                  },
+                  "visibility": "internal"
+                }
+              ],
+              "src": "190:12:12"
+            },
+            "returnParameters": {
+              "id": 5053,
+              "nodeType": "ParameterList",
+              "parameters": [],
+              "src": "211:0:12"
+            },
+            "scope": 5055,
+            "src": "156:56:12",
+            "stateMutability": "nonpayable",
+            "virtual": false,
+            "visibility": "external"
+          }
+        ],
+        "scope": 5056,
+        "src": "67:147:12"
+      }
+    ],
+    "src": "33:182:12"
+  },
+  "compiler": {
+    "name": "solc",
+    "version": "0.7.6+commit.7338295f.Emscripten.clang"
+  },
+  "networks": {},
+  "schemaVersion": "3.2.4",
+  "updatedAt": "2021-06-28T14:44:18.018Z",
+  "devdoc": {
+    "kind": "dev",
+    "methods": {},
+    "version": 1
+  },
+  "userdoc": {
+    "kind": "user",
+    "methods": {},
+    "version": 1
+  }
+}

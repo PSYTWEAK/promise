@@ -5,25 +5,22 @@ import {IERC20} from "./interfaces/IERC20.sol";
 import {SafeMath} from "./lib/math/SafeMath.sol";
 import {ReentrancyGuard} from "./lib/ReentrancyGuard.sol";
 import {ShareCalculator} from "./lib/math/ShareCalculator.sol";
+import {PromiseList} from "./PromiseList.sol";
 
-contract PromiseCore is ReentrancyGuard {
+contract PromiseCore is ReentrancyGuard, PromiseList {
     using SafeMath for uint256;
     using ShareCalculator for uint224;
-    uint256 public startBlockTime;
-    address public feeAddress;
-    uint256 public fee = 5;
 
-    mapping(uint256 => PromData) public promises;
-    mapping(uint256 => mapping(bytes32 => Promjoiners)) public joiners;
+    mapping(uint256 => PromiseData) public promises;
+    mapping(uint256 => mapping(bytes32 => PromiseJoinerData)) public joiners;
     mapping(uint256 => uint256) public joinersLength;
-
-    mapping(bytes32 => LinkedList) public list;
-    mapping(bytes32 => bytes32) tail;
-    mapping(bytes32 => uint256) length;
 
     uint256 public lastId;
 
-    struct PromData {
+    address public feeAddress;
+    uint256 public feeBP = 50;
+
+    struct PromiseData {
         address creator;
         address creatorToken;
         uint112 creatorAmount;
@@ -36,16 +33,10 @@ contract PromiseCore is ReentrancyGuard {
         uint256 expirationTimestamp;
     }
 
-    struct Promjoiners {
+    struct PromiseJoinerData {
         uint256 amountPaid;
         uint256 outstandingDebt;
         bool hasExecuted;
-    }
-
-    struct LinkedList {
-        bytes32 next;
-        uint256 id;
-        bytes32 previous;
     }
 
     event PromiseCreated(
@@ -64,7 +55,6 @@ contract PromiseCore is ReentrancyGuard {
 
     constructor(address _feeAddress) public {
         feeAddress = _feeAddress;
-        startBlockTime = block.timestamp;
     }
 
     function createPromise(
@@ -75,7 +65,11 @@ contract PromiseCore is ReentrancyGuard {
         uint112 joinerAmount,
         uint256 expirationTimestamp
     ) external nonReentrant {
+        // Any odd amount entered will be converted to an even number so we need to check if the amount
+        // is equal to 0 when halved.
         require(creatorAmount / 2 != 0 && joinerAmount / 2 != 0, "Amount too small");
+        // Takes the creator amount of the creator token from the message sender before
+        // the promise is created.
         IERC20(creatorToken).transferFrom(msg.sender, address(this), uint256(creatorAmount).div(2));
         _createPromise(
             account,
@@ -98,7 +92,7 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
+        //require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
         if (account == promises[id].creator) {
             require(promises[id].hasCreatorExecuted == false, "Already executed");
             require(promises[id].creatorDebt > 0, "OutstandingDebt is 0");
@@ -106,7 +100,7 @@ contract PromiseCore is ReentrancyGuard {
             promises[id].creatorDebt = 0;
             emit PromisePaid(account, id, promises[id].creatorDebt);
         } else {
-            bytes32 joinerId = sha256(abi.encodePacked(id, account));
+            bytes32 joinerId = keccak256(abi.encodePacked(id, account));
             require(joiners[id][joinerId].outstandingDebt > 0, "OutstandingDebt is 0");
             require(joiners[id][joinerId].hasExecuted == false, "Already executed");
             IERC20(promises[id].joinerToken).transferFrom(
@@ -124,12 +118,10 @@ contract PromiseCore is ReentrancyGuard {
 
     function closePendingPromiseAmount(uint256 id) external nonReentrant {
         require(msg.sender == promises[id].creator, "Only the creator can close");
-        PromData memory p = promises[id];
-        /*      
-        Calculate how much needs to be refunded
-        this is only the capital which is not being utilised by the joiners. 
-        No joiners means all capital added by the creator is refunded.
-       */
+        PromiseData memory p = promises[id];
+        // totalJoinerCapital is the amount of the creator token which is set to be given out
+        // to all the joiners upon execution. This is removed from the creators refund and the account
+        // is sent the amount of creator tokens which is untilised by the joiners.
         uint256 totalJoinerCapital = (p.joinerPaidFull).add(p.joinerDebt.mul(2));
         uint256 refund =
             (uint256(p.creatorAmount).sub(p.creatorDebt)).sub(
@@ -158,10 +150,10 @@ contract PromiseCore is ReentrancyGuard {
     }
 
     function executePromise(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
+        //require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
         uint256 creatorAmount;
         uint256 joinerAmount;
-        PromData memory p = promises[id];
+        PromiseData memory p = promises[id];
         if (account == promises[id].creator) {
             require(promises[id].hasCreatorExecuted == false, "Already executed");
             require(promises[id].creatorDebt == 0, "Creator didn't go through with the promise");
@@ -181,13 +173,13 @@ contract PromiseCore is ReentrancyGuard {
                 p.joinerAmount
             );
         } else {
-            bytes32 joinerId = sha256(abi.encodePacked(id, account));
+            bytes32 joinerId = keccak256(abi.encodePacked(id, account));
             require(joiners[id][joinerId].hasExecuted == false, "Already executed");
             require(joiners[id][joinerId].outstandingDebt == 0, "Joiner didn't go through with the promise");
             joiners[id][joinerId].hasExecuted = true;
-            Promjoiners memory j = joiners[id][joinerId];
+            PromiseJoinerData memory j = joiners[id][joinerId];
             creatorAmount = divMul(
-                uint112(uint256(p.creatorAmount).sub(uint256(p.creatorDebt))),
+                uint112(uint256(p.creatorAmount).sub(p.creatorDebt)),
                 p.joinerAmount,
                 (j.amountPaid).sub(j.outstandingDebt)
             );
@@ -220,7 +212,7 @@ contract PromiseCore is ReentrancyGuard {
     ) internal {
         //require(expirationTimestamp > block.timestamp.add(10 minutes), "expirationTimestamp date is in the past");
         lastId += 1;
-        promises[lastId] = PromData(
+        promises[lastId] = PromiseData(
             account,
             creatorToken,
             creatorAmount,
@@ -232,10 +224,8 @@ contract PromiseCore is ReentrancyGuard {
             0,
             expirationTimestamp
         );
-        addToJoinableList(creatorToken, joinerToken, expirationTimestamp, creatorAmount, joinerAmount);
-        bytes32 listId = sha256(abi.encodePacked(account));
-        bytes32 entry = sha256(abi.encodePacked(listId, lastId));
-        addEntry(lastId, listId, entry);
+        addToJoinableList(creatorToken, joinerToken, expirationTimestamp, creatorAmount, joinerAmount, lastId);
+        addToAccountList(lastId, account);
 
         emit PromiseCreated(account, creatorToken, creatorAmount, joinerToken, joinerAmount, expirationTimestamp);
     }
@@ -243,32 +233,27 @@ contract PromiseCore is ReentrancyGuard {
     function _joinPromise(
         uint256 id,
         address account,
-        uint112 _amount
+        uint112 joinerAmount
     ) internal {
-        PromData memory p = promises[id];
-        bytes32 joinerId = sha256(abi.encodePacked(id, account));
+        PromiseData storage p = promises[id];
+        bytes32 joinerId = keccak256(abi.encodePacked(id, account));
         uint256 leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
         //require(p.expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
-        require(_amount <= leftOverjoinerAmount, "Amount too high for this promise");
-        bytes32 listId = sha256(abi.encodePacked(id));
-        bytes32 entry = sha256(abi.encodePacked(listId, account));
+        require(joinerAmount <= leftOverjoinerAmount, "Amount too high for this promise");
+        uint256 amountPayable = uint256(joinerAmount).div(2);
+        require(amountPayable > 0, "Amount too small");
+        bytes32 listId = keccak256(abi.encodePacked(id));
+        bytes32 entry = keccak256(abi.encodePacked(listId, account));
         addEntry(joinersLength[id], listId, entry);
         if (joiners[id][joinerId].amountPaid == 0) {
-            listId = sha256(abi.encodePacked(account));
-            entry = sha256(abi.encodePacked(listId, id));
-            addEntry(id, listId, entry);
+            addToAccountList(id, account);
         }
-        uint256 amount = uint256(_amount).div(2);
-        require(amount > 0, "Amount too small");
-        promises[id].joinerDebt += amount;
-        joiners[id][joinerId].outstandingDebt += amount;
-        joiners[id][joinerId].amountPaid += amount;
+        promises[id].joinerDebt += amountPayable;
+        joiners[id][joinerId].outstandingDebt += amountPayable;
+        joiners[id][joinerId].amountPaid += amountPayable;
         joinersLength[id]++;
-        p = promises[id];
         leftOverjoinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-        /*        
-         if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list 
-       */
+        // if the maximum amount of tokens have joined the promise, this removes the promise from the joinable linked list
         if (leftOverjoinerAmount == 0) {
             deleteFromJoinableList(
                 id,
@@ -280,113 +265,22 @@ contract PromiseCore is ReentrancyGuard {
             );
         }
 
-        emit PromiseJoined(account, id, amount);
+        emit PromiseJoined(account, id, amountPayable);
     }
 
     function payOut(
-        uint256 amountA,
-        uint256 amountB,
+        uint256 amountOfCreatorAsset,
+        uint256 amountOfJoinerAsset,
         address account,
-        address assetA,
-        address assetB
+        address creatorAsset,
+        address joinerAsset
     ) internal {
-        uint256 feeA = amountA.mul(fee).div(1000);
-        uint256 feeB = amountB.mul(fee).div(1000);
-        IERC20(assetA).transfer(account, amountA.sub(feeA));
-        IERC20(assetB).transfer(account, amountB.sub(feeB));
-        IERC20(assetA).transfer(feeAddress, feeA);
-        IERC20(assetB).transfer(feeAddress, feeB);
-    }
-
-    function addEntry(
-        uint256 id,
-        bytes32 listId,
-        bytes32 entry
-    ) internal {
-        if (length[listId] > 0) {
-            list[tail[listId]].next = entry;
-            list[entry].id = id;
-            list[entry].previous = tail[listId];
-            tail[listId] = entry;
-        } else {
-            list[listId].id = id;
-            tail[listId] = listId;
-        }
-        length[listId] += 1;
-    }
-
-    function deleteEntry(
-        uint256 id,
-        bytes32 listId,
-        bytes32 index
-    ) internal {
-        if (list[listId].id != id && list[index].id == id) {
-            if (list[index].next != "") {
-                list[list[index].next].previous = list[index].previous;
-            }
-            if (list[index].previous != "") {
-                list[list[index].previous].next = list[index].next;
-                if (tail[listId] == index) {
-                    tail[listId] = list[index].previous;
-                }
-            }
-            list[index].previous = "";
-            list[index].next = "";
-            length[listId] -= 1;
-        } else if (list[listId].id == id) {
-            list[listId].id = list[list[listId].next].id;
-            list[listId].next = list[list[listId].next].next;
-            length[listId] -= 1;
-        }
-    }
-
-    function deleteFromAccountList(uint256 id, address account) internal {
-        bytes32 listId = sha256(abi.encodePacked(account));
-        bytes32 index = sha256(abi.encodePacked(listId, id));
-        deleteEntry(id, listId, index);
-    }
-
-    function deleteFromJoinableList(
-        uint256 id,
-        address creatorToken,
-        address joinerToken,
-        uint256 expirationTimestamp,
-        uint112 creatorAmount,
-        uint112 joinerAmount
-    ) internal {
-        bytes32 listId =
-            sha256(
-                abi.encodePacked(
-                    creatorToken,
-                    joinerToken,
-                    numberOfMonthsSinceDeployed(expirationTimestamp),
-                    numberOfBytesInUint(creatorAmount),
-                    numberOfBytesInUint(joinerAmount)
-                )
-            );
-        bytes32 index = sha256(abi.encodePacked(listId, id));
-        deleteEntry(id, listId, index);
-    }
-
-    function addToJoinableList(
-        address creatorToken,
-        address joinerToken,
-        uint256 expirationTimestamp,
-        uint112 creatorAmount,
-        uint112 joinerAmount
-    ) internal {
-        bytes32 listId =
-            sha256(
-                abi.encodePacked(
-                    creatorToken,
-                    joinerToken,
-                    numberOfMonthsSinceDeployed(expirationTimestamp),
-                    numberOfBytesInUint(creatorAmount),
-                    numberOfBytesInUint(joinerAmount)
-                )
-            );
-        bytes32 entry = sha256(abi.encodePacked(listId, lastId));
-        addEntry(lastId, listId, entry);
+        uint256 feeA = amountOfCreatorAsset.mul(feeBP).div(10000);
+        uint256 feeB = amountOfJoinerAsset.mul(feeBP).div(10000);
+        IERC20(creatorAsset).transfer(account, amountOfCreatorAsset.sub(feeA));
+        IERC20(joinerAsset).transfer(account, amountOfJoinerAsset.sub(feeB));
+        IERC20(creatorAsset).transfer(feeAddress, feeA);
+        IERC20(joinerAsset).transfer(feeAddress, feeB);
     }
 
     function divMul(
@@ -395,129 +289,5 @@ contract PromiseCore is ReentrancyGuard {
         uint256 c
     ) public view returns (uint256 result) {
         result = ShareCalculator.divMul(a, b, uint224(c));
-    }
-
-    function numberOfMonthsSinceDeployed(uint256 expirationTimestamp) internal view returns (uint256 result) {
-        result = (expirationTimestamp.sub(startBlockTime)).div(30 days);
-    }
-
-    function numberOfBytesInUint(uint112 number) public pure returns (uint256 _length) {
-        _length = 0;
-        while (number != 0) {
-            number >>= 8;
-            _length++;
-        }
-    }
-
-    function joinablePromises(
-        address _creatorToken,
-        address _joinerToken,
-        uint256 preferedDateWithinMonth,
-        uint112 preferedCreatorAmount,
-        uint112 preferedJoinerAmount
-    )
-        public
-        view
-        returns (
-            uint256[] memory id,
-            uint256[] memory creatorAmount,
-            uint256[] memory joinerAmount,
-            uint256[] memory expirationTimestamp
-        )
-    {
-        bytes32 listId =
-            sha256(
-                abi.encodePacked(
-                    _creatorToken,
-                    _joinerToken,
-                    numberOfMonthsSinceDeployed(preferedDateWithinMonth),
-                    numberOfBytesInUint(preferedCreatorAmount),
-                    numberOfBytesInUint(preferedJoinerAmount)
-                )
-            );
-        uint256 _length = length[listId];
-
-        id = new uint256[](_length);
-        creatorAmount = new uint256[](_length);
-        joinerAmount = new uint256[](_length);
-        expirationTimestamp = new uint256[](_length);
-
-        uint256 i;
-        bytes32 index = listId;
-        PromData memory p;
-        while (i < _length) {
-            id[i] = list[index].id;
-            p = promises[id[i]];
-            creatorAmount[i] = uint256(p.creatorAmount).sub(
-                divMul(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-            );
-            joinerAmount[i] = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-            expirationTimestamp[i] = p.expirationTimestamp;
-            index = list[index].next;
-
-            i++;
-        }
-    }
-
-    function accountPromises(address account)
-        public
-        view
-        returns (
-            uint256[] memory id,
-            uint256[] memory outstandingDebt,
-            uint256[] memory receiving,
-            uint256[] memory expirationTimestamp,
-            address[] memory tokens
-        )
-    {
-        bytes32 listId = sha256(abi.encodePacked(account));
-        uint256 _length = length[listId];
-
-        id = new uint256[](_length);
-        outstandingDebt = new uint256[](_length);
-        receiving = new uint256[](_length);
-        expirationTimestamp = new uint256[](_length);
-        // tokens array is twice the length because it has 2 entries added every loop
-        tokens = new address[](_length.mul(2));
-
-        uint256 i;
-        bytes32 index = listId;
-        PromData memory p;
-        Promjoiners memory j;
-        while (i < _length) {
-            id[i] = list[index].id;
-            p = promises[id[i]];
-            tokens[i > 0 ? i * 2 : 0] = p.creatorToken;
-            tokens[i > 0 ? (i * 2) + 1 : 1] = p.joinerToken;
-            if (p.creator == account) {
-                outstandingDebt[i] = p.creatorDebt;
-                receiving[i] = uint256(p.joinerDebt).add(p.joinerPaidFull);
-            } else {
-                bytes32 joinerId = sha256(abi.encodePacked(id[i], account));
-                j = joiners[id[i]][joinerId];
-                outstandingDebt[i] = j.outstandingDebt;
-                receiving[i] = divMul(p.creatorAmount, p.joinerAmount, (j.amountPaid).add(j.outstandingDebt));
-            }
-            expirationTimestamp[i] = p.expirationTimestamp;
-            index = list[index].next;
-            i++;
-        }
-    }
-
-    function getPromise(uint256 _id)
-        public
-        view
-        returns (
-            uint256 creatorAmount,
-            uint256 joinerAmount,
-            uint256 expirationTimestamp
-        )
-    {
-        PromData memory p = promises[_id];
-        creatorAmount = uint256(p.creatorAmount).sub(
-            divMul(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull).add(p.joinerDebt.mul(2)))
-        );
-        joinerAmount = uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
-        expirationTimestamp = p.expirationTimestamp;
     }
 }

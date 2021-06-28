@@ -1,15 +1,16 @@
 // SPDX-License-Identifier: GPL-3.0
 
 pragma solidity >=0.7.0 <0.9.0;
-import "truffle/Assert.sol";
-import "../interfaces/IPromiseCore.sol";
-import "../interfaces/IERC20.sol";
+import {IPromiseCore} from "../interfaces/IPromiseCore.sol";
+import {IPromiseFinder} from "../interfaces/IPromiseFinder.sol";
+import {IERC20} from "../interfaces/IERC20.sol";
 
 contract PromTest {
     uint112 nonce;
     address public token1;
     address public token2;
-    address public promiseCore;
+    IPromiseCore public promiseCore;
+    IPromiseFinder public promiseFinder;
     address alice = address(0x0A098Eda01Ce92ff4A4CCb7A4fFFb5A43EBC70DC);
     address bob = address(0xAb8483F64d9C6d1EcF9b849Ae677dD3315835cb2);
     uint256 currentId;
@@ -19,17 +20,19 @@ contract PromTest {
     uint256[] promiseIds;
     uint256 creatorOutstandingDebt;
 
-    event debt(uint256 outstandingDebt, uint256 projectedOutstandingDebt);
+    event debtOwed(uint256 outstandingDebt, uint256 projectedOutstandingDebt);
     event paid(uint256 shouldPaidThis, uint256 wasPaidThis);
     event leftOver(uint256 creatorTokenAmount, uint256 joinerTokenAmount);
     event joinedWith(uint256 amountToJoin, uint256 amountJoinedWith);
 
     constructor(
-        address _promiseCore,
+        IPromiseCore _promiseCore,
+        IPromiseFinder _promiseFinder,
         address _t1,
         address _t2
     ) {
         promiseCore = _promiseCore;
+        promiseFinder = _promiseFinder;
         token1 = _t1;
         token2 = _t2;
     }
@@ -132,7 +135,7 @@ contract PromTest {
 
     // creator closes pending amount
     function scenario5ClosePendingAmount() public {
-        IPromiseCore(promiseCore).closePendingPromiseAmount(currentId);
+        promiseCore.closePendingPromiseAmount(currentId);
     }
 
     // executes promises for alice and bob
@@ -150,18 +153,29 @@ contract PromTest {
         uint112 amountIn = getRandomNumber();
         uint112 amountOut = getRandomNumber();
         uint256 balanceBefore = IERC20(token1).balanceOf(address(this));
-        IPromiseCore(promiseCore).createPromise(
-            address(this),
-            token1,
-            amountIn,
-            token2,
-            amountOut,
-            block.timestamp + 11 minutes
-        );
+        promiseCore.createPromise(address(this), token1, amountIn, token2, amountOut, block.timestamp + 5 days);
         uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
         require(balanceBefore - balanceAfter == amountIn / 2, "wrong amount taken during creation");
         currentId++;
-        currentExpiry = block.timestamp + 11 minutes;
+        currentExpiry = block.timestamp + 5 days;
+        currentCreatorAmount = amountIn;
+        currentJoinerAmount = amountOut;
+        promiseIds.push(currentId);
+        checkAccountPromisesIsCorrect(currentId, address(this), amountIn / 2);
+        creatorOutstandingDebt = amountIn / 2;
+        checkJoinablePromisesIsCorrect(currentId, token1, token2, amountIn, amountOut);
+    }
+
+    function createPromise_2() public {
+        approve();
+        uint112 amountIn = getRandomNumber();
+        uint112 amountOut = getRandomNumber();
+        uint256 balanceBefore = IERC20(token1).balanceOf(address(this));
+        promiseCore.createPromise(address(this), token1, amountIn, token2, amountOut, block.timestamp + 6 days);
+        uint256 balanceAfter = IERC20(token1).balanceOf(address(this));
+        require(balanceBefore - balanceAfter == amountIn / 2, "wrong amount taken during creation");
+        currentId++;
+        currentExpiry = block.timestamp + 6 days;
         currentCreatorAmount = amountIn;
         currentJoinerAmount = amountOut;
         promiseIds.push(currentId);
@@ -176,7 +190,7 @@ contract PromTest {
         uint112 _amount
     ) public {
         uint256 balanceBefore = IERC20(token2).balanceOf(address(this));
-        IPromiseCore(promiseCore).joinPromise(id, account, _amount);
+        promiseCore.joinPromise(id, account, _amount);
         uint256 balanceAfter = IERC20(token2).balanceOf(address(this));
         require(balanceBefore - balanceAfter == _amount / 2, "wrong amount taken during joining");
         checkAccountPromisesIsCorrect(id, account, _amount / 2);
@@ -189,13 +203,13 @@ contract PromTest {
         (, debt) = getReceivingAndOutstandingDebt(_id, account);
         if (account == address(this)) {
             balanceBefore = IERC20(token1).balanceOf(address(this));
-            IPromiseCore(promiseCore).payPromise(_id, account);
+            promiseCore.payPromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(address(this));
             require(debt == balanceBefore - balanceAfter, "incorrect amount paid to the promise by creator");
             creatorOutstandingDebt = 0;
         } else {
             balanceBefore = IERC20(token2).balanceOf(address(this));
-            IPromiseCore(promiseCore).payPromise(_id, account);
+            promiseCore.payPromise(_id, account);
             balanceAfter = IERC20(token2).balanceOf(address(this));
             require(debt == balanceBefore - balanceAfter, "incorrect amount paid to the promise by joiner");
         }
@@ -209,20 +223,20 @@ contract PromTest {
         (receiving, ) = getReceivingAndOutstandingDebt(_id, account);
         if (account == address(this)) {
             balanceBefore = IERC20(token2).balanceOf(account);
-            IPromiseCore(promiseCore).executePromise(_id, account);
+            promiseCore.executePromise(_id, account);
             balanceAfter = IERC20(token2).balanceOf(account);
-            bool greaterThan = (receiving - (((receiving) * 5) / 1000)) > (balanceAfter - balanceBefore);
-            bool lessThan = (receiving - (((receiving) * 5) / 1000)) < (balanceAfter - balanceBefore);
-            require(greaterThan == false, "lower amount paid to the creator at execution");
-            require(lessThan == false, "higher amount paid to the creator at execution");
+            bool greaterThan = (receiving - (((receiving) * 50) / 10000)) > (balanceAfter - balanceBefore);
+            bool lessThan = (receiving - (((receiving) * 50) / 10000)) < (balanceAfter - balanceBefore);
+            require(!greaterThan, "lower amount paid to the creator at execution");
+            require(!lessThan, "higher amount paid to the creator at execution");
         } else {
             balanceBefore = IERC20(token1).balanceOf(account);
-            IPromiseCore(promiseCore).executePromise(_id, account);
+            promiseCore.executePromise(_id, account);
             balanceAfter = IERC20(token1).balanceOf(account);
-            bool greaterThan = (receiving - (((receiving) * 5) / 1000)) > (balanceAfter - balanceBefore);
-            bool lessThan = (receiving - (((receiving) * 5) / 1000)) < (balanceAfter - balanceBefore);
-            require(greaterThan == false, "lower amount paid to the creator at execution");
-            require(lessThan == false, "higher amount paid to the creator at execution");
+            bool greaterThan = (receiving - (((receiving) * 50) / 10000)) > (balanceAfter - balanceBefore);
+            bool lessThan = (receiving - (((receiving) * 50) / 10000)) < (balanceAfter - balanceBefore);
+            require(!greaterThan, "lower amount paid to the creator at execution");
+            require(!lessThan, "higher amount paid to the creator at execution");
         }
 
         checkRemovedFromAccountPromises(_id, account);
@@ -237,13 +251,13 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = promiseFinder.accountPromises(account);
         uint256 i;
         while (_id != id[i]) {
             i++;
             require(i < 40, "ID not found in account promises");
         }
-        emit debt(outstandingDebt[i], _outstandingDebt);
+        emit debtOwed(outstandingDebt[i], _outstandingDebt);
         require(outstandingDebt[i] == _outstandingDebt, "outstanding debt on account promises is incorrect");
     }
 
@@ -251,7 +265,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = promiseFinder.accountPromises(account);
         uint256 i;
         while (i < id.length) {
             require(_id != id[i], "Promise wasn't removed from account promises");
@@ -261,7 +275,7 @@ contract PromTest {
 
     function checkRemovedFromJoinablePromises(uint256 _id) public view {
         uint256[] memory id;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(
+        (id, , , ) = promiseFinder.joinablePromises(
             token1,
             token2,
             currentExpiry,
@@ -279,7 +293,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory receiving;
         uint256[] memory outstandingDebt;
-        (id, outstandingDebt, receiving, , ) = IPromiseCore(promiseCore).accountPromises(account);
+        (id, outstandingDebt, receiving, , ) = promiseFinder.accountPromises(account);
         uint256 i;
         while (_id != id[i]) {
             i++;
@@ -299,7 +313,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, , , ) = IPromiseCore(promiseCore).joinablePromises(
+        (id, , , ) = promiseFinder.joinablePromises(
             _token1,
             _token2,
             currentExpiry,
@@ -311,10 +325,6 @@ contract PromTest {
             i++;
             require(i < 40, "ID not found in account promises");
         }
-        /* 
-            require(creatorAmount[i] == _creatorAmount, "amount in on joinable promises is incorrect");
-            require(joinerAmount[i] == _joinerAmount, "amount out on joinable promises is incorrect");
-         */
     }
 
     function getJoinablePromisesAmounts(
@@ -325,7 +335,7 @@ contract PromTest {
         uint256[] memory id;
         uint256[] memory creatorAmount;
         uint256[] memory joinerAmount;
-        (id, creatorAmount, joinerAmount, ) = IPromiseCore(promiseCore).joinablePromises(
+        (id, creatorAmount, joinerAmount, ) = promiseFinder.joinablePromises(
             _token1,
             _token2,
             currentExpiry,
@@ -348,12 +358,18 @@ contract PromTest {
     }
 
     function randomNumber() public view returns (uint112) {
-        return uint112(uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % 1e18);
+        uint256 a = (uint256(keccak256(abi.encodePacked(block.timestamp, nonce))) % 33);
+        uint256 b = (uint256(keccak256(abi.encodePacked(block.timestamp * 2, nonce))) % 60);
+        uint112 c = uint112(uint256(a << b));
+        if (c < 100) {
+            c = 10**18;
+        }
+        return c;
     }
 
     function approve() public {
-        IERC20(token1).approve(promiseCore, 2**256 - 1);
-        IERC20(token2).approve(promiseCore, 2**256 - 1);
+        IERC20(token1).approve(address(promiseCore), 2**256 - 1);
+        IERC20(token2).approve(address(promiseCore), 2**256 - 1);
     }
 
     function checkBalance(address token, address account) public view returns (uint256 z) {
@@ -361,8 +377,8 @@ contract PromTest {
     }
 
     function hasLeftOver() public {
-        uint256 bal = checkBalance(token1, promiseCore) + checkBalance(token2, promiseCore);
-        emit leftOver(checkBalance(token1, promiseCore), checkBalance(token2, promiseCore));
+        uint256 bal = checkBalance(token1, address(promiseCore)) + checkBalance(token2, address(promiseCore));
+        emit leftOver(checkBalance(token1, address(promiseCore)), checkBalance(token2, address(promiseCore)));
         //require(bal == 0, "Promise contract was left with some tokens");
     }
 }

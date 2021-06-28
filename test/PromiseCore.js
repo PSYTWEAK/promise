@@ -1,17 +1,20 @@
 const PromiseCore = artifacts.require("./PromiseCore.sol");
+const PromiseFinder = artifacts.require("./PromiseFinder.sol");
 const PromiseToken = artifacts.require("./token/PromiseToken.sol");
 const TestToken = artifacts.require("./token/TestToken.sol");
 const PromTest = artifacts.require("./test/PromTest.sol");
 const ShareCalulator = artifacts.require("./lib/math/ShareCalculator.sol");
 
-contract("PromCore", async (accounts) => {
+contract("Promise Core useage test", async (accounts) => {
   let prom, token1, token2, promTester;
   before("Set up", async () => {
-    prom = await PromiseCore.new(accounts[0]);
+    promCore = await PromiseCore.new(accounts[0]);
+    promFinder = await PromiseFinder.new(promCore.address);
     token1 = await PromiseToken.new();
     token2 = await TestToken.new();
     promTester = await PromTest.new(
-      prom.address,
+      promCore.address,
+      promFinder.address,
       token1.address,
       token2.address
     );
@@ -22,7 +25,6 @@ contract("PromCore", async (accounts) => {
       from: accounts[0],
     });
   });
-  let i = 0;
 
   it("Scenario One - Creator makes promise, alice and bob join half each, all 3 pay", async () => {
     await promTester.scenario1();
@@ -42,18 +44,16 @@ contract("PromCore", async (accounts) => {
   it("All participants except alice execute with correct amounts paid out", async () => {
     await promTester.scenario3Execution();
   });
-  while (i < 100) {
-    it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
-      await promTester.scenario4();
-    });
-    it("Creator closes pending amount and is paid out correctly", async () => {
-      await promTester.scenario5ClosePendingAmount();
-    });
-    it("All participants execute with correct amounts paid out", async () => {
-      await promTester.scenario4Execution();
-    });
-    i++;
-  }
+  it("Scenario Four - Creator makes promise, alice and bob join fractions each, 2 pay creator doesn't and 3 execute", async () => {
+    await promTester.scenario4();
+  });
+  it("Creator closes pending amount and is paid out correctly", async () => {
+    await promTester.scenario5ClosePendingAmount();
+  });
+  it("All participants execute with correct amounts paid out", async () => {
+    await promTester.scenario4Execution();
+  });
+
   it("Scenario Five - Creator makes promise, lots of users join, some pay and some execute", async () => {
     await promTester.scenario5();
     for (var i = 1; i < 8; i++) {
@@ -70,7 +70,7 @@ contract("PromCore", async (accounts) => {
     }
   });
 
-  it(`Promise spam number ${i}, creating, joining and executing`, async () => {
+  it(`Promise spam number, creating, joining and executing`, async () => {
     await promTester.scenario5();
     for (var i = 1; i < 8; i++) {
       await promTester.scenario5JoiningAndPaying(accounts[i]);
