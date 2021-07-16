@@ -8,7 +8,7 @@ library ShareCalculator {
         uint112 x,
         uint112 y,
         uint224 z
-    ) public view returns (uint256 d) {
+    ) public pure returns (uint256 d) {
         uint224 a = encode(x);
         uint224 b = div(a, y);
         uint224 c = mul(z, b);

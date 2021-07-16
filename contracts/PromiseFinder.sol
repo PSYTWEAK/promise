@@ -85,12 +85,23 @@ contract PromiseFinder {
         Promjoiners memory j;
         (p.creator, , , , , , , , , ) = promiseCore.promises(id);
         if (p.creator == account) {
-            (, p.creatorToken, , p.creatorDebt, , p.joinerToken, , p.joinerDebt, p.joinerPaidFull, ) = promiseCore
-                .promises(id);
+            (
+                ,
+                p.creatorToken,
+                ,
+                p.creatorDebt,
+                ,
+                p.joinerToken,
+                ,
+                p.joinerDebt,
+                p.joinerPaidFull,
+                p.expirationTimestamp
+            ) = promiseCore.promises(id);
             outstandingDebt = p.creatorDebt;
             receiving = p.joinerDebt + p.joinerPaidFull;
             creatorToken = p.creatorToken;
             joinerToken = p.joinerToken;
+            expirationTimestamp = p.expirationTimestamp;
         } else {
             bytes32 joinerId = keccak256(abi.encodePacked(id, account));
             (j.amountPaid, j.outstandingDebt, j.hasExecuted) = promiseCore.joiners(id, joinerId);
@@ -110,8 +121,8 @@ contract PromiseFinder {
             receiving = promiseCore.divMul(p.creatorAmount, p.joinerAmount, j.amountPaid + j.outstandingDebt);
             creatorToken = p.joinerToken;
             joinerToken = p.creatorToken;
+            expirationTimestamp = p.expirationTimestamp;
         }
-        expirationTimestamp = p.expirationTimestamp;
     }
 
     function joinablePromises(
@@ -202,16 +213,15 @@ contract PromiseFinder {
         joinerAmount = new uint256[](numberOfPromises);
         expirationTimestamp = new uint256[](numberOfPromises);
 
-        bytes32 listId;
         uint256 _length;
         uint256 i;
         uint256 j;
-        while (j < _listId.length - 1 && i < numberOfPromises) {
-            listId = _listId[j];
-            _length = promiseCore.length(listId);
-            bytes32 index = listId;
+        uint256 q;
+        while (j < _listId.length && i < numberOfPromises) {
+            _length = promiseCore.length(_listId[j]);
+            bytes32 index = _listId[j];
             PromData memory p;
-            while (i < _length && i < numberOfPromises) {
+            while (q < _length) {
                 (index, id[i], ) = promiseCore.list(index);
                 (
                     ,
@@ -230,8 +240,10 @@ contract PromiseFinder {
                     (promiseCore.divMul(p.creatorAmount, p.joinerAmount, (p.joinerPaidFull) + (p.joinerDebt * 2)));
                 joinerAmount[i] = uint256(p.joinerAmount) - ((p.joinerPaidFull) + (p.joinerDebt * 2));
                 expirationTimestamp[i] = p.expirationTimestamp;
+                q++;
                 i++;
             }
+            q = 0;
             j++;
         }
         uint256 excess = numberOfPromises - i;
@@ -239,7 +251,7 @@ contract PromiseFinder {
             mstore(id, sub(mload(id), excess))
             mstore(creatorAmount, sub(mload(creatorAmount), excess))
             mstore(joinerAmount, sub(mload(joinerAmount), excess))
-            mstore(joinerAmount, sub(mload(joinerAmount), excess))
+            mstore(expirationTimestamp, sub(mload(expirationTimestamp), excess))
         }
     }
 
@@ -260,15 +272,19 @@ contract PromiseFinder {
         numOfPromisesInTimeInterval = new uint256[](numberOfTimeIntervals);
         uint256 expirationTimestamp = minExpiryDate;
         uint256 i;
+        uint256 _numberOfPromisesInTimeInterval;
         while (expirationTimestamp < maxExpiryDate - timeInterval) {
-            expirationTimestampWithinInterval[i] = expirationTimestamp;
-            numOfPromisesInTimeInterval[i] = promiseCore.numberOfPromisesInTimeInterval(
+            _numberOfPromisesInTimeInterval = promiseCore.numberOfPromisesInTimeInterval(
                 keccak256(
                     abi.encodePacked(creatorToken, joinerToken, numberOfTimeIntervalsSinceDeployed(expirationTimestamp))
                 )
             );
+            if (_numberOfPromisesInTimeInterval > 0) {
+                expirationTimestampWithinInterval[i] = expirationTimestamp;
+                numOfPromisesInTimeInterval[i] = _numberOfPromisesInTimeInterval;
+                i++;
+            }
             expirationTimestamp += timeInterval;
-            i++;
         }
         uint256 excess = numberOfTimeIntervals - i;
         assembly {

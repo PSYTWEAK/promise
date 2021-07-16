@@ -16,7 +16,7 @@ contract PromiseChef is Ownable, PromiseList {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
 
-    struct ChefPromiseInfo {
+    struct UserInfo {
         uint256 amount;
         uint256 rewardDebt;
     }
@@ -59,24 +59,28 @@ contract PromiseChef is Ownable, PromiseList {
     // Info of each pool.
     PoolInfo[] public poolInfo;
     // Info of each promise that stakes LP tokens.
-    mapping(uint256 => mapping(uint256 => ChefPromiseInfo)) public chefPromiseInfo;
+    mapping(uint256 => mapping(address => UserInfo)) public userInfo;
     // The last prom rewards claim fo this user.
     mapping(address => uint256) public lastClaim;
     // Total allocation points. Must be the sum of all allocation points in all pools.
     uint256 public totalAllocPoint = 0;
     // The block number when PROM mining starts.
     uint256 public startBlock;
+    // The block when PROM mining stops.
+    uint256 public endBlock;
 
     constructor(
         PromiseToken _prom,
         PromiseCore _promiseCore,
         uint256 _promPerBlock,
-        uint256 _startBlock
+        uint256 _startBlock,
+        uint256 _endBlock
     ) public Ownable(msg.sender) {
         prom = _prom;
         promiseCore = _promiseCore;
         promPerBlock = _promPerBlock;
         startBlock = block.number;
+        endBlock = _endBlock;
     }
 
     function poolLength() external view returns (uint256) {
@@ -135,13 +139,9 @@ contract PromiseChef is Ownable, PromiseList {
     }
 
     // View function to see pending PROMs on frontend.
-    function pendingProm(
-        uint256 _pid,
-        address _user,
-        uint256 promiseId
-    ) external view returns (uint256) {
+    function pendingProm(uint256 _pid, address _user) external view returns (uint256) {
         PoolInfo storage pool = poolInfo[_pid];
-        ChefPromiseInfo storage chefPromise = chefPromiseInfo[_pid][promiseId];
+        UserInfo storage user = userInfo[_pid][_user];
         uint256 accPromPerShare = pool.accPromPerShare;
         uint256 lpSupply = pool.lpSupply;
         if (block.number > pool.lastRewardBlock && lpSupply != 0) {
@@ -149,7 +149,7 @@ contract PromiseChef is Ownable, PromiseList {
             uint256 promReward = multiplier.mul(promPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
             accPromPerShare = accPromPerShare.add(promReward.mul(1e12).div(lpSupply));
         }
-        return chefPromise.amount.mul(accPromPerShare).div(1e12).sub(chefPromise.rewardDebt);
+        return user.amount.mul(accPromPerShare).div(1e12).sub(user.rewardDebt);
     }
 
     // Update reward variables for all pools. Be careful of gas spending!
@@ -163,20 +163,21 @@ contract PromiseChef is Ownable, PromiseList {
     // Update reward variables of the given pool to be up-to-date.
     function updatePool(uint256 _pid) public {
         PoolInfo storage pool = poolInfo[_pid];
-        if (block.number <= pool.lastRewardBlock) {
+        uint256 lastBlock = block.number < endBlock ? block.number : endBlock;
+        if (lastBlock <= pool.lastRewardBlock) {
             return;
         }
         uint256 lpSupply = pool.lpSupply;
+
         if (lpSupply == 0 || pool.allocPoint == 0) {
-            pool.lastRewardBlock = block.number;
+            pool.lastRewardBlock = lastBlock;
             return;
         }
-        uint256 multiplier = getMultiplier(pool.lastRewardBlock, block.number);
+        uint256 multiplier = getMultiplier(pool.lastRewardBlock, lastBlock);
         uint256 promReward = multiplier.mul(promPerBlock).mul(pool.allocPoint).div(totalAllocPoint);
 
-        prom.mint(address(this), promReward);
         pool.accPromPerShare = pool.accPromPerShare.add(promReward.mul(1e12).div(lpSupply));
-        pool.lastRewardBlock = block.number;
+        pool.lastRewardBlock = lastBlock;
     }
 
     // Deposit LP tokens to MasterChef for PROM allocation.
@@ -186,7 +187,7 @@ contract PromiseChef is Ownable, PromiseList {
         uint256 _joinerAmount
     ) public {
         PoolInfo storage pool = poolInfo[_pid];
-        ChefPromiseInfo storage chefPromise = chefPromiseInfo[_pid][promiseCore.lastId().add(1)];
+        UserInfo storage user = userInfo[_pid][msg.sender];
         uint256 creatorAmount = uint112(_creatorAmount.div(2).mul(2));
         uint256 ratio = calculateRatio(_creatorAmount, _joinerAmount);
         require(
@@ -205,9 +206,9 @@ contract PromiseChef is Ownable, PromiseList {
                 uint112(_joinerAmount),
                 pool.expirationDate
             );
-            chefPromise.amount = chefPromise.amount.add(creatorAmount);
+            user.amount = user.amount.add(creatorAmount);
             addToAccountList(promiseCore.lastId(), msg.sender);
-            chefPromise.rewardDebt = chefPromise.amount.mul(pool.accPromPerShare).div(1e12);
+            user.rewardDebt = user.amount.mul(pool.accPromPerShare).div(1e12);
         }
     }
 
@@ -241,79 +242,77 @@ contract PromiseChef is Ownable, PromiseList {
             list[listId].id == promiseId || list[index].id == promiseId,
             "Message sender is not the creator of this promise"
         );
+        deleteFromAccountList(promiseId, account);
+
         if (!p.hasCreatorExecuted) {
             promiseCore.executePromise(promiseId, promiseHolder);
         }
         uint256 creatorTokenPayout =
-            uint256(p.creatorAmount).sub(p.creatorDebt.mul(2)).sub(
+            uint256(p.creatorAmount).sub(p.creatorDebt).sub(
                 promiseCore.divMul(uint112(p.creatorAmount), uint112(p.joinerAmount), p.joinerPaidFull)
             );
         uint256 joinerTokenPayout = uint256(p.joinerDebt).add(p.joinerPaidFull);
-
+        withdrawFromPool(_pid, p.creatorAmount, account);
         if (creatorTokenPayout > 0) {
+            creatorTokenPayout = creatorTokenPayout.sub((creatorTokenPayout).mul(promiseCore.feeBP()).div(10000));
             IERC20(p.creatorToken).transferFrom(promiseHolder, account, creatorTokenPayout);
         }
         if (joinerTokenPayout > 0) {
+            joinerTokenPayout = joinerTokenPayout.sub((joinerTokenPayout).mul(promiseCore.feeBP()).div(10000));
             IERC20(p.joinerToken).transferFrom(promiseHolder, account, joinerTokenPayout);
         }
-        withdrawFromPool(_pid, p.creatorAmount, promiseId, account);
-        deleteFromAccountList(promiseId, account);
     }
 
     function closePendingPromiseAmount(uint256 _pid, uint256 promiseId) external {
-        (, address creatorToken, , , , address joinerToken, , , , ) = promiseCore.promises(promiseId);
+        PoolInfo storage pool = poolInfo[_pid];
         bytes32 listId = keccak256(abi.encodePacked(msg.sender));
         bytes32 index = keccak256(abi.encodePacked(listId, promiseId));
         require(
             list[listId].id == promiseId || list[index].id == promiseId,
             "Message sender is not the creator of this promise"
         );
-        uint256 holderBalanceBeforeClose = IERC20(joinerToken).balanceOf(promiseHolder);
+        uint256 promiseHolderBalance = pool.creatorToken.balanceOf(promiseHolder);
         IPromiseHolder(promiseHolder).closePendingPromiseAmount(promiseId);
-        uint256 creatorTokenRefund = (IERC20(joinerToken).balanceOf(promiseHolder)).sub(holderBalanceBeforeClose);
-        if (creatorTokenRefund > 0) {
-            IERC20(creatorToken).transferFrom(promiseHolder, msg.sender, creatorTokenRefund);
+        uint256 creatorTokenRefund = (pool.creatorToken.balanceOf(promiseHolder)).sub(promiseHolderBalance);
+        (, address creatorToken, uint256 creatorAmount, , , address joinerToken, , , , ) =
+            promiseCore.promises(promiseId);
+        require(
+            creatorToken == address(pool.creatorToken) && joinerToken == pool.joinerToken,
+            "This promise was not created with this pool"
+        );
+        if (creatorAmount == 0) {
+            deleteFromAccountList(promiseId, msg.sender);
         }
-        withdrawFromPool(_pid, creatorTokenRefund, promiseId, msg.sender);
+        withdrawFromPool(_pid, creatorTokenRefund, msg.sender);
+        IERC20(pool.creatorToken).transferFrom(promiseHolder, msg.sender, creatorTokenRefund);
     }
 
-    function claimReward(uint256 _pid, uint256 promiseId) external {
+    function claimReward(uint256 _pid) external {
         PoolInfo storage pool = poolInfo[_pid];
-        ChefPromiseInfo storage chefPromise = chefPromiseInfo[_pid][promiseId];
-        address creator;
-        bool creatorExectuted;
-        (creator, , , , creatorExectuted, , , , , ) = promiseCore.promises(promiseId);
-        bytes32 listId = keccak256(abi.encodePacked(msg.sender));
-        bytes32 index = keccak256(abi.encodePacked(listId, promiseId));
-        require(
-            list[listId].id == promiseId || list[index].id == promiseId,
-            "Message sender is not the creator of this promise"
-        );
-        require(creatorExectuted == false, "creator executed the promise so its not longer valid");
+        UserInfo storage user = userInfo[_pid][msg.sender];
         updatePool(_pid);
-        uint256 pending = chefPromise.amount.mul(pool.accPromPerShare).div(1e12).sub(chefPromise.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accPromPerShare).div(1e12).sub(user.rewardDebt);
         if (pending > 0) {
             safePromTransfer(msg.sender, pending);
         }
-        chefPromise.rewardDebt = chefPromise.amount.mul(pool.accPromPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(pool.accPromPerShare).div(1e12);
     }
 
     // Withdraw LP tokens from MasterChef.
     function withdrawFromPool(
         uint256 _pid,
         uint256 _amount,
-        uint256 promiseId,
         address account
     ) internal {
         PoolInfo storage pool = poolInfo[_pid];
-        ChefPromiseInfo storage chefPromise = chefPromiseInfo[_pid][promiseId];
-        require(chefPromise.amount >= _amount, "withdraw: not good");
+        UserInfo storage user = userInfo[_pid][account];
+        require(user.amount >= _amount, "withdraw: not good");
         updatePool(_pid);
-        uint256 pending = chefPromise.amount.mul(pool.accPromPerShare).div(1e12).sub(chefPromise.rewardDebt);
+        uint256 pending = user.amount.mul(pool.accPromPerShare).div(1e12).sub(user.rewardDebt);
         safePromTransfer(account, pending);
         pool.lpSupply = pool.lpSupply.add(_amount);
-        chefPromise.amount = chefPromise.amount.sub(_amount);
-        chefPromise.rewardDebt = chefPromise.amount.mul(pool.accPromPerShare).div(1e12);
+        user.amount = user.amount.sub(_amount);
+        user.rewardDebt = user.amount.mul(pool.accPromPerShare).div(1e12);
     }
 
     // Safe prom transfer function, just in case if rounding error causes pool to not have enough PROMs.
@@ -338,13 +337,5 @@ contract PromiseChef is Ownable, PromiseList {
 
     function calculateRatio(uint256 creatorAmount, uint256 joinerAmount) public pure returns (uint256 z) {
         z = creatorAmount.mul(1 ether).div(joinerAmount);
-    }
-
-    function max(uint256 a, uint256 b) internal pure returns (uint256 c) {
-        if (a > b) {
-            c = a;
-        } else {
-            c = b;
-        }
     }
 }

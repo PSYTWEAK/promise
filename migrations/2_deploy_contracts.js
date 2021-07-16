@@ -29,7 +29,8 @@ module.exports = async function (deployer, accounts) {
     promiseToken.address,
     promiseCore.address,
     "1000000000000000000",
-    "100"
+    "100",
+    "30966004"
   );
   const promiseChef = await PromiseChef.deployed();
   await deployer.deploy(
@@ -41,19 +42,36 @@ module.exports = async function (deployer, accounts) {
   await deployer.deploy(
     PromiseChefFinder,
     promiseCore.address,
-    promiseChef.address
+    promiseChef.address,
+    promiseHolder.address
   );
   const promiseChefFinder = await PromiseChefFinder.deployed();
-  await promiseToken.transferOwnership(promiseChef.address);
+  await promiseToken.mint(promiseChef.address, "100000000000000000000000");
   await promiseChef.setPromiseHolder(promiseHolder.address);
 
-  const allocationPoints = "10000";
-  const creatorToken = promiseToken.address;
-  const joinerToken = "0xff795577d9ac8bd7d90ee22b6c1703490b6512fd";
-  const minUncalculatedRatio = ["10000", "9000"];
-  const maxUncalculatedRatio = ["10000", "1000"];
-  const updatePool = true;
-  const expirationDate = "74384738437843983";
+  let allocationPoints = "10000";
+  let creatorToken = promiseToken.address;
+  let joinerToken = "0xff795577d9ac8bd7d90ee22b6c1703490b6512fd";
+  let minUncalculatedRatio = ["1", "100"];
+  let maxUncalculatedRatio = ["1", "70"];
+  let updatePool = true;
+  let expirationDate = "1638796682";
+  await promiseChef.add(
+    allocationPoints,
+    creatorToken,
+    joinerToken,
+    minUncalculatedRatio,
+    maxUncalculatedRatio,
+    updatePool,
+    expirationDate
+  );
+  allocationPoints = "20000";
+  creatorToken = promiseToken.address;
+  joinerToken = "0x144edb9c8504e1b8b0323ecf6a7bf02c0e671167";
+  minUncalculatedRatio = ["1", "2000"];
+  maxUncalculatedRatio = ["1", "1000"];
+  updatePool = true;
+  expirationDate = "1638796682";
   await promiseChef.add(
     allocationPoints,
     creatorToken,
@@ -64,7 +82,7 @@ module.exports = async function (deployer, accounts) {
     expirationDate
   );
 
-  await deployer.deploy(Helper, promiseCore.address);
+  await deployer.deploy(Helper, promiseCore.address, promiseChef.address);
   const helper = await Helper.deployed();
 
   await deployer.deploy(WETHGateway, promiseCore.address, weth);

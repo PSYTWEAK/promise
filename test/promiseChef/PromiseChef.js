@@ -1,7 +1,8 @@
 var Web3 = require("web3");
 var web3 = new Web3(new Web3.providers.HttpProvider("http://localhost:9545"));
 
-const timeTravel = require("./TimeTravel.js");
+const timeTravel = require("../TimeTravel.js");
+const TEST_DATA = require("./TestData.js");
 const PromiseCore = artifacts.require("./PromiseCore.sol");
 const PromiseToken = artifacts.require("./token/PromiseToken.sol");
 const PromiseChef = artifacts.require("./farms/PromiseChef.sol");
@@ -18,8 +19,9 @@ contract("Quick test for PromiseChef", async (accounts) => {
     promiseChef = await PromiseChef.new(
       promiseToken.address,
       promiseCore.address,
-      "1000000000000000000",
-      "100"
+      TEST_DATA.DEPLOY.promPerBlock,
+      TEST_DATA.DEPLOY.startBlock,
+      TEST_DATA.DEPLOY.endBlock
     );
     promiseHolder = await PromiseHolder.new(
       promiseCore.address,
@@ -27,48 +29,42 @@ contract("Quick test for PromiseChef", async (accounts) => {
     );
   });
   before("Config", async () => {
-    await promiseToken.mint(accounts[0], "8438438473848345454343454354", {
+    await promiseToken.mint(accounts[0], TEST_DATA.USER.promiseTokenToMint, {
       from: accounts[0],
     });
     await promiseToken.approve(
       promiseChef.address,
-      "8438438473848345454343454354"
+      TEST_DATA.USER.promiseTokenToApprove
     );
 
-    await testToken.mint(accounts[0], "3487584937589454544758487954", {
+    await testToken.mint(accounts[0], TEST_DATA.USER.promiseTokenToMint, {
       from: accounts[0],
     });
     await testToken.approve(
       promiseChef.address,
-      "8438438473848345454343454354"
+      TEST_DATA.USER.promiseTokenToApprove
     );
     await promiseToken.transferOwnership(promiseChef.address);
     await promiseChef.setPromiseHolder(promiseHolder.address);
   });
   it("Adding Promise Token / Test Token pool", async () => {
-    const allocationPoints = "10000";
-    const creatorToken = promiseToken.address;
-    const joinerToken = testToken.address;
-    const minUncalculatedRatio = ["10000", "9000"];
-    const maxUncalculatedRatio = ["10000", "1000"];
-    const updatePool = true;
-    const expirationDate = "74384738437843983";
     await promiseChef.add(
-      allocationPoints,
-      creatorToken,
-      joinerToken,
-      minUncalculatedRatio,
-      maxUncalculatedRatio,
-      updatePool,
-      expirationDate
+      TEST_DATA.POOL_0.allocationPoints,
+      promiseToken.address,
+      testToken.address,
+      TEST_DATA.POOL_0.minUncalculatedRatio,
+      TEST_DATA.POOL_0.maxUncalculatedRatio,
+      TEST_DATA.POOL_0.updatePool,
+      TEST_DATA.POOL_0.expirationDate
     );
     const poolInfo = await promiseChef.poolInfo(0);
   });
   it("joining pool 0 as account[0]", async () => {
-    const poolId = "0";
-    const creatorAmount = "10000";
-    const joinerAmount = "8000";
-    await promiseChef.createPromise(poolId, creatorAmount, joinerAmount);
+    await promiseChef.createPromise(
+      0,
+      TEST_DATA.CREATE_PROMISE.creatorAmount,
+      TEST_DATA.CREATE_PROMISE.joinerAmount
+    );
   });
   it("claiming rewards", async () => {
     const poolId = 0;

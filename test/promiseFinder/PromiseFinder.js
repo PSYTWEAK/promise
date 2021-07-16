@@ -78,5 +78,6 @@ contract("Quick test for PromiseFinder", async (accounts) => {
     console.log(result.lengths.toString());
     console.log(result.listIds);
     result = await promFinder._joinablePromisesRaw(result.listIds, "200");
+    console.log(result.expirationTimestamp[0].toString());
   });
 });

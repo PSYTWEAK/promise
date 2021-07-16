@@ -6,6 +6,7 @@ import {PromiseChef} from "./PromiseChef.sol";
 contract PromiseChefFinder {
     PromiseCore public promiseCore;
     PromiseChef public promiseChef;
+    address public promiseHolder;
 
     struct PromData {
         address creator;
@@ -32,9 +33,14 @@ contract PromiseChefFinder {
         bytes32 previous;
     }
 
-    constructor(PromiseCore _promiseCore, PromiseChef _promiseChef) public {
+    constructor(
+        PromiseCore _promiseCore,
+        PromiseChef _promiseChef,
+        address _promiseHolder
+    ) public {
         promiseCore = _promiseCore;
         promiseChef = _promiseChef;
+        promiseHolder = _promiseHolder;
     }
 
     function accountPromises(address account)
@@ -49,7 +55,7 @@ contract PromiseChefFinder {
         )
     {
         bytes32 listId = keccak256(abi.encodePacked(account));
-        uint256 _length = promiseCore.length(listId);
+        uint256 _length = promiseChef.length(listId);
 
         id = new uint256[](_length);
         outstandingDebt = new uint256[](_length);
@@ -87,13 +93,24 @@ contract PromiseChefFinder {
         PromData memory p;
         Promjoiners memory j;
         (p.creator, , , , , , , , , ) = promiseCore.promises(id);
-        if (p.creator == account) {
-            (, p.creatorToken, , p.creatorDebt, , p.joinerToken, , p.joinerDebt, p.joinerPaidFull, ) = promiseCore
-                .promises(id);
+        if (p.creator == promiseHolder) {
+            (
+                ,
+                p.creatorToken,
+                ,
+                p.creatorDebt,
+                ,
+                p.joinerToken,
+                ,
+                p.joinerDebt,
+                p.joinerPaidFull,
+                p.expirationTimestamp
+            ) = promiseCore.promises(id);
             outstandingDebt = p.creatorDebt;
             receiving = p.joinerDebt + p.joinerPaidFull;
             creatorToken = p.creatorToken;
             joinerToken = p.joinerToken;
+            expirationTimestamp = p.expirationTimestamp;
         } else {
             bytes32 joinerId = keccak256(abi.encodePacked(id, account));
             (j.amountPaid, j.outstandingDebt, j.hasExecuted) = promiseCore.joiners(id, joinerId);
@@ -113,7 +130,7 @@ contract PromiseChefFinder {
             receiving = promiseCore.divMul(p.creatorAmount, p.joinerAmount, j.amountPaid + j.outstandingDebt);
             creatorToken = p.joinerToken;
             joinerToken = p.creatorToken;
+            expirationTimestamp = p.expirationTimestamp;
         }
-        expirationTimestamp = p.expirationTimestamp;
     }
 }

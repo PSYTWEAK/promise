@@ -25,7 +25,7 @@ contract PromiseToken is Ownable {
         _symbol = "Prom";
         _decimals = 18;
 
-        _totalSupply = 20000 * 1e18;
+        _totalSupply = 2000;
         _balances[msg.sender] = _totalSupply;
         emit Transfer(address(0), msg.sender, _totalSupply);
     }
