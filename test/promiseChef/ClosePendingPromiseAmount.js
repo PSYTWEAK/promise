@@ -35,12 +35,19 @@ contract("PromiseChef", async (accounts) => {
     await promiseToken.mint(accounts[0], TEST_DATA.USER.promiseTokenToMint, {
       from: accounts[0],
     });
+    await promiseToken.mint(accounts[1], TEST_DATA.USER.promiseTokenToMint, {
+      from: accounts[0],
+    });
     await promiseToken.mint(
       promiseHolder.address,
       TEST_DATA.USER.promiseTokenToMint
     );
     await promiseToken.approve(
       promiseChef.address,
+      TEST_DATA.USER.promiseTokenToApprove
+    );
+    await testToken.approve(
+      promiseCore.address,
       TEST_DATA.USER.promiseTokenToApprove
     );
     await promiseToken.transferOwnership(promiseChef.address);
@@ -70,14 +77,13 @@ contract("PromiseChef", async (accounts) => {
     await promiseChef.payPromise(promiseCounter);
     promiseCounter++;
   });
-  it("Execute Promise from PromiseChef only", async () => {
-    const expectedAmountGiven =
-      parseInt(TEST_DATA.CREATE_PROMISE.creatorAmount) -
-      parseInt(promiseFeeTaken);
+  it("Close pending Promise amount from PromiseChef", async () => {
     const balanceBefore = await promiseToken.balanceOf(accounts[0]);
     const expectedBalanceAfter =
-      parseInt(balanceBefore) + parseInt(expectedAmountGiven);
-    await promiseChef.executePromise(0, 1, accounts[0]);
+      parseInt(balanceBefore) +
+      (parseInt(TEST_DATA.CREATE_PROMISE.creatorAmount) -
+        parseInt(promiseFeeTaken));
+    await promiseChef.closePendingPromiseAmount(0, 1);
     const balanceAfter = await promiseToken.balanceOf(accounts[0]);
     assert.equal(50, promiseFeeBP);
     assert.equal(
@@ -85,33 +91,40 @@ contract("PromiseChef", async (accounts) => {
       expectedBalanceAfter.toLocaleString("full-width", { useGrouping: false })
     );
   });
-  it("Execute Promise from PromiseCore then Promisechef", async () => {
-    await promiseCore.closePendingAmount(2, promiseHolder.address, {
-      from: accounts[1],
-    });
-    const expectedAmountGiven =
-      parseInt(TEST_DATA.CREATE_PROMISE.creatorAmount) -
-      parseInt(promiseFeeTaken);
+  it("Close pending Promise amount after joiner has entered", async () => {
+    await promiseCore.joinPromise(
+      2,
+      accounts[1],
+      Math.round(
+        TEST_DATA.CREATE_PROMISE.joinerAmount / 2
+      ).toLocaleString("full-width", { useGrouping: false })
+    );
     const balanceBefore = await promiseToken.balanceOf(accounts[0]);
-    const expectedBalanceAfter =
-      parseInt(balanceBefore) + parseInt(expectedAmountGiven);
-    await promiseChef.executePromise(0, 2, accounts[0]);
+    const expectedFee =
+      ((parseInt(TEST_DATA.CREATE_PROMISE.creatorAmount) / 2) * promiseFeeBP) /
+      10000;
+    const expectedRefund =
+      parseInt(TEST_DATA.CREATE_PROMISE.creatorAmount) / 2 - expectedFee;
+    const expectedBalanceAfter = parseInt(balanceBefore) + expectedRefund;
+    await promiseChef.closePendingPromiseAmount(0, 2);
     const balanceAfter = await promiseToken.balanceOf(accounts[0]);
     assert.equal(
       balanceAfter.toString(),
-      expectedBalanceAfter.toLocaleString("full-width", { useGrouping: false })
+      expectedBalanceAfter.toLocaleString("full-width", {
+        useGrouping: false,
+      })
     );
   });
   it("Check double execution fails", async () => {
     let hasSucceeded0 = true;
     let hasSucceeded1 = true;
     try {
-      await promiseChef.executePromise(0, 1, accounts[0]);
+      await promiseChef.closePendingPromiseAmount(0, 1);
     } catch {
       hasSucceeded0 = false;
     }
     try {
-      await promiseChef.executePromise(0, 2, accounts[0]);
+      await promiseChef.closePendingPromiseAmount(0, 2);
     } catch {
       hasSucceeded1 = false;
     }

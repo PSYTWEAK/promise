@@ -79,7 +79,6 @@ contract("PromiseChef", async (accounts) => {
       parseInt(balanceBefore) + parseInt(expectedAmountGiven);
     await promiseChef.executePromise(0, 1, accounts[0]);
     const balanceAfter = await promiseToken.balanceOf(accounts[0]);
-    assert.equal(50, promiseFeeBP);
     assert.equal(
       balanceAfter.toString(),
       expectedBalanceAfter.toLocaleString("full-width", { useGrouping: false })

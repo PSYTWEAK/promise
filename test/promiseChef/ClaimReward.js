@@ -31,9 +31,29 @@ contract("PromiseChef", async (accounts) => {
     await promiseToken.mint(accounts[0], TEST_DATA.USER.promiseTokenToMint, {
       from: accounts[0],
     });
+    await promiseToken.mint(accounts[1], TEST_DATA.USER.promiseTokenToMint, {
+      from: accounts[0],
+    });
+    await promiseToken.mint(
+      promiseChef.address,
+      (parseInt(TEST_DATA.DEPLOY.promPerBlock) * 6).toLocaleString(
+        "full-width",
+        {
+          useGrouping: false,
+        }
+      ),
+      {
+        from: accounts[0],
+      }
+    );
     await promiseToken.approve(
       promiseChef.address,
       TEST_DATA.USER.promiseTokenToApprove
+    );
+    await promiseToken.approve(
+      promiseChef.address,
+      TEST_DATA.USER.promiseTokenToApprove,
+      { from: accounts[1] }
     );
     await promiseToken.transferOwnership(promiseChef.address);
     await promiseChef.setPromiseHolder(promiseHolder.address);
@@ -52,32 +72,36 @@ contract("PromiseChef", async (accounts) => {
       TEST_DATA.CREATE_PROMISE.joinerAmount
     );
   });
-  it("Pay Promise", async () => {
+  it("Claim after 1 blocks", async () => {
     const balanceBefore = await promiseToken.balanceOf(accounts[0]);
-    await promiseChef.payPromise(1);
-    const expectedAmountTaken = TEST_DATA.CREATE_PROMISE.creatorAmount / 2;
-    const expectedBalanceAfter = balanceBefore - expectedAmountTaken;
+    await promiseChef.claimReward(0);
+    const expectedBalanceAfter =
+      parseInt(balanceBefore) + parseInt(TEST_DATA.DEPLOY.promPerBlock);
     const balanceAfter = await promiseToken.balanceOf(accounts[0]);
-    assert.equal(expectedBalanceAfter, balanceAfter);
+    assert.equal(balanceAfter.toString(), expectedBalanceAfter.toString());
   });
-  it("Check Data inside of the promise", async () => {
-    const promise = await promiseCore.promises(1);
-    assert.equal(
-      promise.creatorAmount.toString(),
-      TEST_DATA.CREATE_PROMISE.expectedCreatorAmount
+  it("Claim after 3 blocks", async () => {
+    await timeTravel.advanceBlock();
+    const balanceBefore = await promiseToken.balanceOf(accounts[0]);
+    await promiseChef.claimReward(0);
+    const expectedBalanceAfter =
+      parseInt(balanceBefore) + parseInt(TEST_DATA.DEPLOY.promPerBlock * 2);
+    const balanceAfter = await promiseToken.balanceOf(accounts[0]);
+    assert.equal(balanceAfter.toString(), expectedBalanceAfter.toString());
+  });
+  it("Claim after accounts[1] also joined the pool", async () => {
+    await promiseChef.createPromise(
+      0,
+      TEST_DATA.CREATE_PROMISE.creatorAmount * 10,
+      TEST_DATA.CREATE_PROMISE.joinerAmount * 10,
+      { from: accounts[1] }
     );
-    assert.equal(promise.creatorDebt, 0);
-    assert.equal(
-      promise.joinerAmount,
-      TEST_DATA.CREATE_PROMISE.expectedJoinerAmount
-    );
-    assert.equal(
-      promise.joinerPaidFull,
-      TEST_DATA.CREATE_PROMISE.expectedJoinerPaidFull
-    );
-    assert.equal(
-      promise.joinerDebt,
-      TEST_DATA.CREATE_PROMISE.expectedJoinerDebt
-    );
+    await timeTravel.advanceBlock();
+    const balanceBefore = await promiseToken.balanceOf(accounts[0]);
+    const expectedBalanceAfter =
+      parseInt(balanceBefore) + parseInt(TEST_DATA.DEPLOY.promPerBlock) + 1;
+    await promiseChef.claimReward(0);
+    const balanceAfter = await promiseToken.balanceOf(accounts[0]);
+    assert.isAtLeast(parseInt(balanceAfter), parseInt(expectedBalanceAfter));
   });
 });

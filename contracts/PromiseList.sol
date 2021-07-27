@@ -3,23 +3,16 @@ pragma solidity >=0.4.21 <0.8.0;
 
 import {SafeMath} from "./lib/math/SafeMath.sol";
 
-contract PromiseList {
+abstract contract PromiseList {
     using SafeMath for uint256;
     mapping(bytes32 => LinkedList) public list;
     mapping(bytes32 => bytes32) public tail;
     mapping(bytes32 => uint256) public length;
-    mapping(bytes32 => uint256) public numberOfPromisesInTimeInterval;
-    uint256 public joinableListIdTimeInterval = 1 days;
-    uint256 public startBlockTime;
 
     struct LinkedList {
         bytes32 next;
         uint256 id;
         bytes32 previous;
-    }
-
-    constructor() public {
-        startBlockTime = block.timestamp;
     }
 
     function addEntry(
@@ -74,66 +67,5 @@ contract PromiseList {
         bytes32 listId = keccak256(abi.encodePacked(account));
         bytes32 entry = keccak256(abi.encodePacked(listId, id));
         addEntry(id, listId, entry);
-    }
-
-    function deleteFromJoinableList(
-        uint256 id,
-        address creatorToken,
-        address joinerToken,
-        uint256 expirationTimestamp,
-        uint112 creatorAmount,
-        uint112 joinerAmount
-    ) internal {
-        numberOfPromisesInTimeInterval[
-            keccak256(abi.encodePacked(creatorToken, joinerToken, timeIntervalSinceDeployed(expirationTimestamp)))
-        ] -= creatorAmount;
-        bytes32 listId =
-            keccak256(
-                abi.encodePacked(
-                    creatorToken,
-                    joinerToken,
-                    timeIntervalSinceDeployed(expirationTimestamp),
-                    integarBytes(creatorAmount),
-                    integarBytes(joinerAmount)
-                )
-            );
-        bytes32 index = keccak256(abi.encodePacked(listId, id));
-        deleteEntry(id, listId, index);
-    }
-
-    function addToJoinableList(
-        address creatorToken,
-        address joinerToken,
-        uint256 expirationTimestamp,
-        uint112 creatorAmount,
-        uint112 joinerAmount,
-        uint256 lastId
-    ) internal {
-        numberOfPromisesInTimeInterval[
-            keccak256(abi.encodePacked(creatorToken, joinerToken, timeIntervalSinceDeployed(expirationTimestamp)))
-        ] += creatorAmount;
-        bytes32 listId =
-            keccak256(
-                abi.encodePacked(
-                    creatorToken,
-                    joinerToken,
-                    timeIntervalSinceDeployed(expirationTimestamp),
-                    integarBytes(creatorAmount),
-                    integarBytes(joinerAmount)
-                )
-            );
-        bytes32 entry = keccak256(abi.encodePacked(listId, lastId));
-        addEntry(lastId, listId, entry);
-    }
-
-    function timeIntervalSinceDeployed(uint256 expirationTimestamp) internal view returns (uint256 result) {
-        result = (expirationTimestamp.sub(startBlockTime)).div(joinableListIdTimeInterval);
-    }
-
-    function integarBytes(uint112 number) internal pure returns (uint256 _length) {
-        while (number != 0) {
-            number >>= 8;
-            _length++;
-        }
     }
 }

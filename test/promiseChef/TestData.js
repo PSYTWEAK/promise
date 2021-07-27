@@ -33,11 +33,11 @@ var TEST_DATA = {
   },
 
   CREATE_PROMISE: {
-    creatorAmount: "100000",
-    joinerAmount: "80000",
-    expectedCreatorAmount: "100000",
-    expectedCreatorDebt: "50000",
-    expectedJoinerAmount: "80000",
+    creatorAmount: "10000000",
+    joinerAmount: "8000000",
+    expectedCreatorAmount: "10000000",
+    expectedCreatorDebt: "5000000",
+    expectedJoinerAmount: "8000000",
     expectedJoinerPaidFull: 0,
     expectedJoinerDebt: 0,
   },
