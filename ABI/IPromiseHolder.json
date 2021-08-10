@@ -40,15 +40,15 @@
     "absolutePath": "/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol",
     "exportedSymbols": {
       "IPromiseHolder": [
-        4256
+        4262
       ]
     },
-    "id": 4257,
+    "id": 4263,
     "license": "MIT",
     "nodeType": "SourceUnit",
     "nodes": [
       {
-        "id": 4245,
+        "id": 4251,
         "literals": [
           "solidity",
           ">=",
@@ -67,32 +67,32 @@
         "contractDependencies": [],
         "contractKind": "interface",
         "fullyImplemented": false,
-        "id": 4256,
+        "id": 4262,
         "linearizedBaseContracts": [
-          4256
+          4262
         ],
         "name": "IPromiseHolder",
         "nodeType": "ContractDefinition",
         "nodes": [
           {
             "functionSelector": "0f5f4df3",
-            "id": 4250,
+            "id": 4256,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "approvePromiseChef",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 4248,
+              "id": 4254,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 4247,
+                  "id": 4253,
                   "mutability": "mutable",
                   "name": "token",
                   "nodeType": "VariableDeclaration",
-                  "scope": 4250,
+                  "scope": 4256,
                   "src": "126:13:13",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -101,7 +101,7 @@
                     "typeString": "address"
                   },
                   "typeName": {
-                    "id": 4246,
+                    "id": 4252,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
                     "src": "126:7:13",
@@ -117,12 +117,12 @@
               "src": "125:15:13"
             },
             "returnParameters": {
-              "id": 4249,
+              "id": 4255,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "149:0:13"
             },
-            "scope": 4256,
+            "scope": 4262,
             "src": "98:52:13",
             "stateMutability": "nonpayable",
             "virtual": false,
@@ -130,23 +130,23 @@
           },
           {
             "functionSelector": "45ac5e02",
-            "id": 4255,
+            "id": 4261,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "closePendingPromiseAmount",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 4253,
+              "id": 4259,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 4252,
+                  "id": 4258,
                   "mutability": "mutable",
                   "name": "id",
                   "nodeType": "VariableDeclaration",
-                  "scope": 4255,
+                  "scope": 4261,
                   "src": "191:10:13",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -155,7 +155,7 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 4251,
+                    "id": 4257,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
                     "src": "191:7:13",
@@ -170,19 +170,19 @@
               "src": "190:12:13"
             },
             "returnParameters": {
-              "id": 4254,
+              "id": 4260,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "211:0:13"
             },
-            "scope": 4256,
+            "scope": 4262,
             "src": "156:56:13",
             "stateMutability": "nonpayable",
             "virtual": false,
             "visibility": "external"
           }
         ],
-        "scope": 4257,
+        "scope": 4263,
         "src": "67:147:13"
       }
     ],
@@ -192,15 +192,15 @@
     "absolutePath": "/Users/nanoissuperior/promise-contracts/contracts/interfaces/IPromiseHolder.sol",
     "exportedSymbols": {
       "IPromiseHolder": [
-        4256
+        4262
       ]
     },
-    "id": 4257,
+    "id": 4263,
     "license": "MIT",
     "nodeType": "SourceUnit",
     "nodes": [
       {
-        "id": 4245,
+        "id": 4251,
         "literals": [
           "solidity",
           ">=",
@@ -219,32 +219,32 @@
         "contractDependencies": [],
         "contractKind": "interface",
         "fullyImplemented": false,
-        "id": 4256,
+        "id": 4262,
         "linearizedBaseContracts": [
-          4256
+          4262
         ],
         "name": "IPromiseHolder",
         "nodeType": "ContractDefinition",
         "nodes": [
           {
             "functionSelector": "0f5f4df3",
-            "id": 4250,
+            "id": 4256,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "approvePromiseChef",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 4248,
+              "id": 4254,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 4247,
+                  "id": 4253,
                   "mutability": "mutable",
                   "name": "token",
                   "nodeType": "VariableDeclaration",
-                  "scope": 4250,
+                  "scope": 4256,
                   "src": "126:13:13",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -253,7 +253,7 @@
                     "typeString": "address"
                   },
                   "typeName": {
-                    "id": 4246,
+                    "id": 4252,
                     "name": "address",
                     "nodeType": "ElementaryTypeName",
                     "src": "126:7:13",
@@ -269,12 +269,12 @@
               "src": "125:15:13"
             },
             "returnParameters": {
-              "id": 4249,
+              "id": 4255,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "149:0:13"
             },
-            "scope": 4256,
+            "scope": 4262,
             "src": "98:52:13",
             "stateMutability": "nonpayable",
             "virtual": false,
@@ -282,23 +282,23 @@
           },
           {
             "functionSelector": "45ac5e02",
-            "id": 4255,
+            "id": 4261,
             "implemented": false,
             "kind": "function",
             "modifiers": [],
             "name": "closePendingPromiseAmount",
             "nodeType": "FunctionDefinition",
             "parameters": {
-              "id": 4253,
+              "id": 4259,
               "nodeType": "ParameterList",
               "parameters": [
                 {
                   "constant": false,
-                  "id": 4252,
+                  "id": 4258,
                   "mutability": "mutable",
                   "name": "id",
                   "nodeType": "VariableDeclaration",
-                  "scope": 4255,
+                  "scope": 4261,
                   "src": "191:10:13",
                   "stateVariable": false,
                   "storageLocation": "default",
@@ -307,7 +307,7 @@
                     "typeString": "uint256"
                   },
                   "typeName": {
-                    "id": 4251,
+                    "id": 4257,
                     "name": "uint256",
                     "nodeType": "ElementaryTypeName",
                     "src": "191:7:13",
@@ -322,19 +322,19 @@
               "src": "190:12:13"
             },
             "returnParameters": {
-              "id": 4254,
+              "id": 4260,
               "nodeType": "ParameterList",
               "parameters": [],
               "src": "211:0:13"
             },
-            "scope": 4256,
+            "scope": 4262,
             "src": "156:56:13",
             "stateMutability": "nonpayable",
             "virtual": false,
             "visibility": "external"
           }
         ],
-        "scope": 4257,
+        "scope": 4263,
         "src": "67:147:13"
       }
     ],
@@ -346,7 +346,7 @@
   },
   "networks": {},
   "schemaVersion": "3.2.4",
-  "updatedAt": "2021-07-27T14:35:32.623Z",
+  "updatedAt": "2021-07-30T10:48:35.443Z",
   "devdoc": {
     "kind": "dev",
     "methods": {},
