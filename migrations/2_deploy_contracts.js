@@ -23,7 +23,7 @@ module.exports = async function (deployer, accounts) {
   const promiseCore = await PromiseCore.deployed();
   await deployer.deploy(PromiseFinder, promiseCore.address);
   const promiseFinder = await PromiseFinder.deployed();
-  const promiseToken = await PromiseToken.deployed();
+  const promiseToken = await TestToken.deployed();
   await deployer.deploy(
     PromiseChef,
     promiseToken.address,
@@ -51,11 +51,11 @@ module.exports = async function (deployer, accounts) {
 
   let allocationPoints = "10000";
   let creatorToken = promiseToken.address;
-  let joinerToken = "0xff795577d9ac8bd7d90ee22b6c1703490b6512fd";
+  let joinerToken = "0x7ceb23fd6bc0add59e62ac25578270cff1b9f619";
   let minUncalculatedRatio = ["1", "100"];
   let maxUncalculatedRatio = ["1", "70"];
   let updatePool = true;
-  let expirationDate = "1638796682";
+  let expirationDate = "1634554704";
   await promiseChef.add(
     allocationPoints,
     creatorToken,
@@ -67,11 +67,11 @@ module.exports = async function (deployer, accounts) {
   );
   allocationPoints = "20000";
   creatorToken = promiseToken.address;
-  joinerToken = "0x144edb9c8504e1b8b0323ecf6a7bf02c0e671167";
+  joinerToken = "0x8f3cf7ad23cd3cadbd9735aff958023239c6a063";
   minUncalculatedRatio = ["1", "2000"];
   maxUncalculatedRatio = ["1", "1000"];
   updatePool = true;
-  expirationDate = "1638796682";
+  expirationDate = "1634554704";
   await promiseChef.add(
     allocationPoints,
     creatorToken,

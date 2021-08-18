@@ -66,7 +66,6 @@ contract PromiseCore is ReentrancyGuard, PromiseList {
         uint112 joinerAmount,
         uint256 expirationTimestamp
     ) external nonReentrant {
-        require(creatorAmount / 2 != 0 && joinerAmount / 2 != 0, "Amount too small");
         IERC20(creatorToken).transferFrom(msg.sender, address(this), uint256(creatorAmount).div(2));
         _createPromise(
             account,
@@ -83,85 +82,115 @@ contract PromiseCore is ReentrancyGuard, PromiseList {
         address account,
         uint112 amount
     ) external nonReentrant {
-        uint256 payingNow = uint256(amount).div(2);
-        uint256 remainingJoinableFunds = _remainingJoinablefunds(id);
         //  require(promises[id].expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
-        require(promises[id].creator != account, "Can't join your own promise");
-        require(amount <= remainingJoinableFunds, "Amount too high for this promise");
-        require(payingNow > 0, "Amount too small");
-        IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), payingNow);
-        bytes32 joinerId = keccak256(abi.encodePacked(id, account));
+        require(promises[id].creator != account, "PromiseCore: Can't join your own promise");
+        uint256 amountPayingNow = uint256(amount).div(2);
+        uint256 remainingJoinerTokenAmountAbleToJoinPromise = getRemainingAmountAbleToJoinPromise(id);
+        require(amount <= remainingJoinerTokenAmountAbleToJoinPromise, "PromiseCore: Amount too high for this promise");
+        require(amountPayingNow > 0, "PromiseCore: Amount too small");
+        IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), amountPayingNow);
+        _joinPromise(id, account, amountPayingNow);
+    }
+
+    function _joinPromise(
+        uint256 id,
+        address account,
+        uint256 amountPayingNow
+    ) internal {
+        bytes32 joinerId = getJoinerId(id, account);
         if (joiners[id][joinerId].amountPaid == 0) {
             addToAccountList(id, account);
             joinersLength[id]++;
         }
-        promises[id].joinerDebt += payingNow;
-        joiners[id][joinerId].outstandingDebt += payingNow;
-        joiners[id][joinerId].amountPaid += payingNow;
-        emit PromiseJoined(id, account, payingNow);
+        promises[id].joinerDebt += amountPayingNow;
+        joiners[id][joinerId].outstandingDebt += amountPayingNow;
+        joiners[id][joinerId].amountPaid += amountPayingNow;
+        emit PromiseJoined(id, account, amountPayingNow);
     }
 
     function payPromise(uint256 id, address account) external nonReentrant {
         // require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
         if (account == promises[id].creator) {
-            require(promises[id].hasCreatorExecuted == false, "Already executed");
-            require(promises[id].creatorDebt > 0, "OutstandingDebt is 0");
-            IERC20(promises[id].creatorToken).transferFrom(msg.sender, address(this), promises[id].creatorDebt);
-            promises[id].creatorDebt = 0;
-            emit PromisePaid(id, account, promises[id].creatorDebt);
+            require(promises[id].hasCreatorExecuted == false, "PromiseCore: Already executed");
+            require(promises[id].creatorDebt > 0, "PromiseCore: OutstandingDebt is 0");
+            payAsCreator(id, account);
         } else {
-            bytes32 joinerId = keccak256(abi.encodePacked(id, account));
-            require(joiners[id][joinerId].outstandingDebt > 0, "OutstandingDebt is 0");
-            require(joiners[id][joinerId].hasExecuted == false, "Already executed");
-            IERC20(promises[id].joinerToken).transferFrom(
-                msg.sender,
-                address(this),
-                joiners[id][joinerId].outstandingDebt
-            );
-            promises[id].joinerDebt -= joiners[id][joinerId].outstandingDebt;
-            promises[id].joinerPaidFull += joiners[id][joinerId].outstandingDebt.mul(2);
-            joiners[id][joinerId].amountPaid += joiners[id][joinerId].outstandingDebt;
-            emit PromisePaid(id, account, joiners[id][joinerId].outstandingDebt);
-            joiners[id][joinerId].outstandingDebt = 0;
+            bytes32 joinerId = getJoinerId(id, account);
+            require(joiners[id][joinerId].outstandingDebt > 0, "PromiseCore: OutstandingDebt is 0");
+            require(joiners[id][joinerId].hasExecuted == false, "PromiseCore: Already executed");
+            payAsJoiner(id, account, joinerId);
         }
     }
 
-    function closePendingPromiseAmount(uint256 id) external nonReentrant {
-        require(msg.sender == promises[id].creator, "Only the creator can close");
-        PromiseData memory p = promises[id];
-        uint256 refund = creatorRefund(id);
-        require(refund > 0, "Creator has nothing to refund");
-        promises[id].creatorAmount = uint112(uint256(p.creatorAmount).sub(p.creatorDebt).sub(refund));
-        promises[id].joinerAmount = totalJoinerCapital(id);
+    function payAsCreator(uint256 id, address account) internal {
+        IERC20(promises[id].creatorToken).transferFrom(msg.sender, address(this), promises[id].creatorDebt);
         promises[id].creatorDebt = 0;
+        emit PromisePaid(id, account, promises[id].creatorDebt);
+    }
+
+    function payAsJoiner(
+        uint256 id,
+        address account,
+        bytes32 joinerId
+    ) internal {
+        IERC20(promises[id].joinerToken).transferFrom(msg.sender, address(this), joiners[id][joinerId].outstandingDebt);
+        promises[id].joinerDebt -= joiners[id][joinerId].outstandingDebt;
+        promises[id].joinerPaidFull += joiners[id][joinerId].outstandingDebt.mul(2);
+        joiners[id][joinerId].amountPaid += joiners[id][joinerId].outstandingDebt;
+        emit PromisePaid(id, account, joiners[id][joinerId].outstandingDebt);
+        joiners[id][joinerId].outstandingDebt = 0;
+    }
+
+    function closePendingPromiseAmount(uint256 id) external nonReentrant {
+        require(msg.sender == promises[id].creator, "PromiseCore: Only the creator can close");
+        uint256 refund = getCreatorRefundAmount(id);
+        require(refund > 0, "PromiseCore: Creator has nothing to refund");
+        PromiseData storage promiseData = promises[id];
+        promiseData.creatorAmount = getRemainingCreatorAmountAfterClosingPromise(id);
+        promiseData.joinerAmount = getTotalJoinerFundsInPromise(id);
+        promiseData.creatorDebt = 0;
         if (joinersLength[id] == 0) {
             deleteFromAccountList(id, msg.sender);
-            promises[id].hasCreatorExecuted = true;
+            promiseData.hasCreatorExecuted = true;
         }
-        payout(refund, 0, msg.sender, p.creatorToken, p.joinerToken);
+        payout(refund, 0, msg.sender, promiseData.creatorToken, promiseData.joinerToken);
         emit PromisePendingAmountClosed(id, msg.sender, refund);
     }
 
     function executePromise(uint256 id, address account) external nonReentrant {
         // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
-        uint256 creatorTokenPayout;
-        uint256 joinerTokenPayout;
-        PromiseData memory p = promises[id];
         if (account == promises[id].creator) {
-            require(promises[id].hasCreatorExecuted == false, "Already executed");
+            require(promises[id].hasCreatorExecuted == false, "PromiseCore: Already executed");
             promises[id].hasCreatorExecuted = true;
-            (creatorTokenPayout, joinerTokenPayout) = payoutForCreator(id);
+            payoutToCreator(id, account);
             deleteFromAccountList(id, account);
         } else {
-            bytes32 joinerId = keccak256(abi.encodePacked(id, account));
-            require(joiners[id][joinerId].hasExecuted == false, "Already executed");
-            require(joiners[id][joinerId].outstandingDebt == 0, "Joiner didn't go through with the promise");
-            require(joiners[id][joinerId].amountPaid > 0, "Joiner wasn't in this promise");
+            bytes32 joinerId = getJoinerId(id, account);
+            require(joiners[id][joinerId].hasExecuted == false, "PromiseCore: Already executed");
+            require(
+                joiners[id][joinerId].outstandingDebt == 0,
+                "PromiseCore: Joiner didn't go through with the promise"
+            );
+            require(joiners[id][joinerId].amountPaid > 0, "PromiseCore: Joiner wasn't in this promise");
             joiners[id][joinerId].hasExecuted = true;
-            (creatorTokenPayout, joinerTokenPayout) = payoutForJoiner(id, joinerId);
+            payoutToJoiner(id, account, joinerId);
             deleteFromAccountList(id, account);
         }
-        payout(creatorTokenPayout, joinerTokenPayout, account, p.creatorToken, p.joinerToken);
+    }
+
+    function payoutToCreator(uint256 id, address account) internal {
+        (uint256 creatorTokenPayout, uint256 joinerTokenPayout) = getPayoutAmountsForCreator(id);
+        payout(creatorTokenPayout, joinerTokenPayout, account, promises[id].creatorToken, promises[id].joinerToken);
+        emit PromiseExecuted(id, account, creatorTokenPayout, joinerTokenPayout);
+    }
+
+    function payoutToJoiner(
+        uint256 id,
+        address account,
+        bytes32 joinerId
+    ) internal {
+        (uint256 creatorTokenPayout, uint256 joinerTokenPayout) = getPayoutAmountsForJoiner(id, joinerId);
+        payout(creatorTokenPayout, joinerTokenPayout, account, promises[id].creatorToken, promises[id].joinerToken);
         emit PromiseExecuted(id, account, creatorTokenPayout, joinerTokenPayout);
     }
 
@@ -173,6 +202,10 @@ contract PromiseCore is ReentrancyGuard, PromiseList {
         uint112 joinerAmount,
         uint256 expirationTimestamp
     ) internal {
+        require(
+            creatorAmount > 0 && joinerAmount > 0,
+            "PromiseCore: One or both of the amounts (creator/joiner) is too small"
+        );
         //  require(expirationTimestamp > block.timestamp.add(10 minutes), "expirationTimestamp date is in the past");
         lastId += 1;
         promises[lastId] = PromiseData(
@@ -219,25 +252,37 @@ contract PromiseCore is ReentrancyGuard, PromiseList {
         }
     }
 
-    function _remainingJoinablefunds(uint256 id) public view returns (uint256) {
+    function getRemainingCreatorAmountAfterClosingPromise(uint256 id) public view returns (uint112) {
         PromiseData memory p = promises[id];
-        return uint256(p.joinerAmount).sub((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+        uint256 creatorAmount = uint256(p.creatorAmount);
+        uint256 result = creatorAmount.sub(p.creatorDebt).sub(getCreatorRefundAmount(id));
+        return uint112(result);
     }
 
-    function totalJoinerCapital(uint256 id) public view returns (uint112) {
-        PromiseData memory p = promises[id];
-        return uint112((p.joinerPaidFull).add(p.joinerDebt.mul(2)));
+    function getJoinerId(uint256 id, address account) public pure returns (bytes32) {
+        return keccak256(abi.encodePacked(id, account));
     }
 
-    function creatorRefund(uint256 id) public view returns (uint256) {
+    function getRemainingAmountAbleToJoinPromise(uint256 id) public view returns (uint256) {
         PromiseData memory p = promises[id];
-        return
-            (uint256(p.creatorAmount).sub(p.creatorDebt)).sub(
-                divMul(p.creatorAmount, p.joinerAmount, totalJoinerCapital(id))
-            );
+        uint256 existingJoinerTokenAmount = p.joinerPaidFull.add(p.joinerDebt.mul(2));
+        return uint256(p.joinerAmount).sub(existingJoinerTokenAmount);
     }
 
-    function payoutForCreator(uint256 id) public view returns (uint256, uint256) {
+    function getTotalJoinerFundsInPromise(uint256 id) public view returns (uint112) {
+        PromiseData memory p = promises[id];
+        uint256 result = p.joinerPaidFull.add(p.joinerDebt.mul(2));
+        return uint112(result);
+    }
+
+    function getCreatorRefundAmount(uint256 id) public view returns (uint256) {
+        PromiseData memory p = promises[id];
+        uint256 creatorPaid = uint256(p.creatorAmount).sub(p.creatorDebt);
+        uint256 tokensUsedByJoiners = divMul(p.creatorAmount, p.joinerAmount, getTotalJoinerFundsInPromise(id));
+        return creatorPaid.sub(tokensUsedByJoiners);
+    }
+
+    function getPayoutAmountsForCreator(uint256 id) public view returns (uint256, uint256) {
         PromiseData memory p = promises[id];
         return (
             uint256(p.creatorAmount).sub(p.creatorDebt).sub(divMul(p.creatorAmount, p.joinerAmount, p.joinerPaidFull)),
@@ -245,16 +290,13 @@ contract PromiseCore is ReentrancyGuard, PromiseList {
         );
     }
 
-    function payoutForJoiner(uint256 id, bytes32 joinerId) public view returns (uint256, uint256) {
+    function getPayoutAmountsForJoiner(uint256 id, bytes32 joinerId) public view returns (uint256, uint256) {
         PromiseData memory p = promises[id];
         PromiseJoinerData memory j = joiners[id][joinerId];
+        uint256 paidByCreator = uint256(p.creatorAmount).sub(p.creatorDebt);
         return (
-            divMul(
-                uint112(uint256(p.creatorAmount).sub(p.creatorDebt)),
-                p.joinerAmount,
-                (j.amountPaid).sub(j.outstandingDebt)
-            ),
-            p.creatorDebt > 0 ? ((j.amountPaid).sub(j.outstandingDebt.mul(2))) : 0
+            divMul(uint112(paidByCreator), p.joinerAmount, (j.amountPaid).sub(j.outstandingDebt.mul(2))),
+            p.creatorDebt > 0 ? ((j.amountPaid).sub(j.outstandingDebt)) : 0
         );
     }
 
