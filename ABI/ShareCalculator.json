@@ -28,7 +28,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -47,7 +48,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -71,7 +73,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -95,7 +98,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     },
     {
       "inputs": [
@@ -114,7 +118,8 @@
         }
       ],
       "stateMutability": "pure",
-      "type": "function"
+      "type": "function",
+      "constant": true
     }
   ],
   "metadata": "{\"compiler\":{\"version\":\"0.7.6+commit.7338295f\"},\"language\":\"Solidity\",\"output\":{\"abi\":[{\"inputs\":[{\"internalType\":\"uint224\",\"name\":\"x\",\"type\":\"uint224\"}],\"name\":\"decode\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"z\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint224\",\"name\":\"x\",\"type\":\"uint224\"},{\"internalType\":\"uint112\",\"name\":\"y\",\"type\":\"uint112\"}],\"name\":\"div\",\"outputs\":[{\"internalType\":\"uint224\",\"name\":\"z\",\"type\":\"uint224\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint112\",\"name\":\"x\",\"type\":\"uint112\"},{\"internalType\":\"uint112\",\"name\":\"y\",\"type\":\"uint112\"},{\"internalType\":\"uint224\",\"name\":\"z\",\"type\":\"uint224\"}],\"name\":\"divMul\",\"outputs\":[{\"internalType\":\"uint256\",\"name\":\"d\",\"type\":\"uint256\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint112\",\"name\":\"y\",\"type\":\"uint112\"}],\"name\":\"encode\",\"outputs\":[{\"internalType\":\"uint224\",\"name\":\"z\",\"type\":\"uint224\"}],\"stateMutability\":\"pure\",\"type\":\"function\"},{\"inputs\":[{\"internalType\":\"uint224\",\"name\":\"x\",\"type\":\"uint224\"},{\"internalType\":\"uint224\",\"name\":\"y\",\"type\":\"uint224\"}],\"name\":\"mul\",\"outputs\":[{\"internalType\":\"uint224\",\"name\":\"z\",\"type\":\"uint224\"}],\"stateMutability\":\"pure\",\"type\":\"function\"}],\"devdoc\":{\"kind\":\"dev\",\"methods\":{},\"version\":1},\"userdoc\":{\"kind\":\"user\",\"methods\":{},\"version\":1}},\"settings\":{\"compilationTarget\":{\"project:/contracts/lib/math/ShareCalculator.sol\":\"ShareCalculator\"},\"evmVersion\":\"istanbul\",\"libraries\":{},\"metadata\":{\"bytecodeHash\":\"ipfs\"},\"optimizer\":{\"enabled\":false,\"runs\":200},\"remappings\":[]},\"sources\":{\"project:/contracts/lib/math/ShareCalculator.sol\":{\"keccak256\":\"0x841178baccee8a7b0a2adf228aed49a612d05757e0f0fb228da60b23cd8f06fd\",\"license\":\"MIT\",\"urls\":[\"bzz-raw://cf74c5f2ff716d5ef4f6884a3a6e07ded0f93685bfb4a9bfb67abaafd7ff0509\",\"dweb:/ipfs/QmYP5BanakNuTiKT3KSmHudmmFMYYnGozvyWJWy3eKzQcf\"]}},\"version\":1}",
@@ -3299,9 +3304,17 @@
     "name": "solc",
     "version": "0.7.6+commit.7338295f.Emscripten.clang"
   },
-  "networks": {},
+  "networks": {
+    "137": {
+      "events": {},
+      "links": {},
+      "address": "0x41C5DC178Cbff9951ad9Fd05Ef0b4Ad7f53aC315",
+      "transactionHash": "0x9959efd3315b8557f507a97a3dc6f4f2d1f761a1afd7b515e84d5a455082f7b8"
+    }
+  },
   "schemaVersion": "3.4.2",
-  "updatedAt": "2021-08-18T12:33:33.699Z",
+  "updatedAt": "2021-08-18T13:30:49.945Z",
+  "networkType": "ethereum",
   "devdoc": {
     "kind": "dev",
     "methods": {},
