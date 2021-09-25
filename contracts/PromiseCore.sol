@@ -81,8 +81,7 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
         uint256 id,
         address account,
         uint112 amount
-    ) external nonReentrant {
-        //  require(promises[id].expirationTimestamp > block.timestamp, "expirationTimestamp date is in the past and can't be joined");
+    ) external onlyActive(id) nonReentrant {
         uint256 amountPayingNow = uint256(amount).div(2);
         uint256 remainingJoinerTokenAmountAbleToJoinPromise = getRemainingAmountAbleToJoinPromise(id);
         require(amount <= remainingJoinerTokenAmountAbleToJoinPromise, "PromiseCore: Amount too high for this promise");
@@ -107,16 +106,14 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
         emit PromiseJoined(id, account, amountPayingNow);
     }
 
-    function payPromiseAsCreator(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
+    function payPromiseAsCreator(uint256 id, address account) external onlyActive(id) nonReentrant {
         require(ownerOf(id) == account, "PromiseCore: This account is owner of the creator NFT");
         require(promises[id].hasCreatorExecuted == false, "PromiseCore: Already executed");
         require(promises[id].creatorDebt > 0, "PromiseCore: OutstandingDebt is 0");
         takeCreatorPayment(id, account);
     }
 
-    function payPromiseAsJoiner(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp > block.timestamp, "Promise expired");
+    function payPromiseAsJoiner(uint256 id, address account) external onlyActive(id) nonReentrant {
         bytes32 joinerId = getJoinerId(id, account);
         require(joiners[id][joinerId].outstandingDebt > 0, "PromiseCore: OutstandingDebt is 0");
         require(joiners[id][joinerId].hasExecuted == false, "PromiseCore: Already executed");
@@ -158,8 +155,7 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
         emit PromisePendingAmountClosed(id, msg.sender, refund);
     }
 
-    function executePromiseAsCreator(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
+    function executePromiseAsCreator(uint256 id, address account) external onlyExpired(id) nonReentrant {
         require(ownerOf(id) == account, "PromiseCore: This account is not the creator");
         require(promises[id].hasCreatorExecuted == false, "PromiseCore: Already executed");
         promises[id].hasCreatorExecuted = true;
@@ -167,8 +163,7 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
         deleteFromAccountList(id, account);
     }
 
-    function executePromiseAsJoiner(uint256 id, address account) external nonReentrant {
-        // require(promises[id].expirationTimestamp <= block.timestamp, "This promise has not expired yet");
+    function executePromiseAsJoiner(uint256 id, address account) external onlyExpired(id) nonReentrant {
         bytes32 joinerId = getJoinerId(id, account);
         require(joiners[id][joinerId].hasExecuted == false, "PromiseCore: Already executed");
         require(joiners[id][joinerId].outstandingDebt == 0, "PromiseCore: Joiner didn't go through with the promise");
@@ -204,9 +199,12 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
     ) internal {
         require(
             creatorAmount > 0 && joinerAmount > 0,
-            "PromiseCore: One or both of the amounts (creator/joiner) is too small"
+            "PromiseCore: One or both of the amounts for creator and joiner is too small"
         );
-        //  require(expirationTimestamp > block.timestamp.add(10 minutes), "expirationTimestamp date is in the past");
+        require(
+            expirationTimestamp > block.timestamp.add(10 minutes),
+            "PromiseCore: expirationTimestamp has to be more than 10 minutes into the future."
+        );
         lastId += 1;
         _mint(account, lastId);
         promises[lastId] = PromiseData(
@@ -251,6 +249,15 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
             IERC20(joinerAsset).transfer(account, joinerTokenAmount.sub(feeB));
             IERC20(joinerAsset).transfer(feeAddress, feeB);
         }
+    }
+
+    modifier onlyExpired(uint256 id) {
+        require(promises[id].expirationTimestamp <= block.timestamp, "PromiseCore: This promise has not expired yet");
+        _;
+    }
+    modifier onlyActive(uint256 id) {
+        require(promises[id].expirationTimestamp > block.timestamp, "PromiseCore: This promise has expired");
+        _;
     }
 
     function getRemainingCreatorAmountAfterClosingPromise(uint256 id) public view returns (uint112) {
