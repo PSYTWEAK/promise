@@ -165,9 +165,9 @@ contract PromiseCore is ReentrancyGuard, PromiseList, ERC721 {
 
     function executePromiseAsJoiner(uint256 id, address account) external onlyExpired(id) nonReentrant {
         bytes32 joinerId = getJoinerId(id, account);
+        require(joiners[id][joinerId].amountPaid > 0, "PromiseCore: Joiner wasn't in this promise");
         require(joiners[id][joinerId].hasExecuted == false, "PromiseCore: Already executed");
         require(joiners[id][joinerId].outstandingDebt == 0, "PromiseCore: Joiner didn't go through with the promise");
-        require(joiners[id][joinerId].amountPaid > 0, "PromiseCore: Joiner wasn't in this promise");
         joiners[id][joinerId].hasExecuted = true;
         payoutToJoiner(id, account, joinerId);
         deleteFromAccountList(id, account);

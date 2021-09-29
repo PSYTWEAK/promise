@@ -4,36 +4,56 @@ pragma solidity >=0.4.21 <0.8.4;
 
 interface IPromiseCore {
     event PromiseCreated(
+        uint256 id,
         address creator,
-        address cToken,
-        uint256 cAmount,
-        address jToken,
-        uint256 jAmount,
-        uint256 expiry
+        address creatorToken,
+        uint256 creatorAmount,
+        address joinerToken,
+        uint256 joinerAmount,
+        uint256 expirationTimestamp
     );
 
-    event PromiseJoined(address addrB, uint256 id, uint256 amount);
-    event PromiseCanceled(address executor, uint256 id);
-    event PromiseExecuted(address executor, uint256 id);
+    event PromiseJoined(uint256 id, address joiner, uint256 amount);
+    event PromisePendingAmountClosed(uint256 id, address executor, uint256 refund);
+    event PromiseExecuted(uint256 id, address account, uint256 creatorTokenAmount, uint256 joinerTokenAmount);
+    event PromisePaid(uint256 id, address account, uint256 amount);
 
     function createPromise(
         address account,
-        address cToken,
-        uint112 cAmount,
-        address jToken,
-        uint112 jAmount,
-        uint256 expiry
+        address creatorToken,
+        uint112 creatorAmount,
+        address joinerToken,
+        uint112 joinerAmount,
+        uint256 expirationTimestamp
     ) external;
 
     function joinPromise(
         uint256 id,
         address account,
-        uint112 _amount
+        uint112 amount
     ) external;
 
-    function payPromise(uint256 id, address account) external;
+    function payPromiseAsCreator(uint256 id, address account) external;
 
-    function executePromise(uint256 id, address account) external;
+    function payPromiseAsJoiner(uint256 id, address account) external;
 
     function closePendingPromiseAmount(uint256 id) external;
+
+    function executePromiseAsCreator(uint256 id, address account) external;
+
+    function executePromiseAsJoiner(uint256 id, address account) external;
+
+    function getRemainingCreatorAmountAfterClosingPromise(uint256 id) external returns (uint112);
+
+    function getJoinerId(uint256 id, address account) external returns (bytes32);
+
+    function getRemainingAmountAbleToJoinPromise(uint256 id) external returns (uint256);
+
+    function getTotalJoinerFundsInPromise(uint256 id) external returns (uint112);
+
+    function getCreatorRefundAmount(uint256 id) external returns (uint256);
+
+    function getPayoutAmountsForCreator(uint256 id) external returns (uint256, uint256);
+
+    function getPayoutAmountsForJoiner(uint256 id, bytes32 joinerId) external returns (uint256, uint256);
 }
